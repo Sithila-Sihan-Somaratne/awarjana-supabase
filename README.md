@@ -63,8 +63,8 @@ A modern web application for managing photoframe orders, inventory, and producti
    
    The `.env` file is already configured with your Supabase credentials:
    ```
-   VITE_SUPABASE_URL=https://yqqzdkhelrzxhniygoxd.supabase.co
-   VITE_SUPABASE_ANON_KEY=your_anon_key
+   URL=url.com
+   ANONKEY=AnonKEY
    ```
 
 4. **Set Up Database Schema**
@@ -329,7 +329,7 @@ All components adapt to screen size automatically.
    - Set publish directory: `dist`
 
 3. **Environment Variables**
-   - Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to Netlify environment
+   - Add them to Netlify environment
 
 4. **Deploy**
    - Netlify automatically deploys on push
