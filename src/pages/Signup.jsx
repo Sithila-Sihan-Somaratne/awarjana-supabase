@@ -1,4 +1,3 @@
-// src/pages/Signup.jsx
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -39,6 +38,7 @@ export default function Signup() {
   const handlePasswordChange = (value) => {
     setPassword(value)
     const validation = validatePassword(value)
+    console.log('🔐 [PASSWORD DEBUG] Validation result:', validation)
     setPasswordStrength(validation)
   }
 
@@ -46,6 +46,18 @@ export default function Signup() {
     e.preventDefault()
     setAlertMessage(null)
 
+    console.log('🔍 [SIGNUP DEBUG] Form submitted with:', {
+      email,
+      passwordLength: password.length,
+      passwordValid: passwordStrength.valid,
+      passwordErrors: passwordStrength.errors,
+      passwordsMatch: password === confirmPassword,
+      role,
+      registrationCode,
+      shouldRequireCode: (role === 'worker' || role === 'admin')
+    })
+
+    // ENABLE VALIDATION - Critical for production
     if (!passwordStrength.valid) {
       setAlertMessage({ 
         type: 'error', 
@@ -68,6 +80,8 @@ export default function Signup() {
 
     const result = await requestSignupOTP(email, password, role, registrationCode)
     
+    console.log('📬 [SIGNUP DEBUG] API response:', result)
+    
     if (result.success) {
       setSignupData({
         email,
@@ -81,19 +95,26 @@ export default function Signup() {
       setOtpSent(true)
       setAlertMessage({
         type: 'info',
-        // 🚨 UPDATED: Changed "6-digit" to "8-character"
-        message: `An ${OTP_LENGTH}-character verification code has been sent to ${email}. Please check your inbox.`
+        message: `An ${OTP_LENGTH}-character verification code has been sent to ${email}. Please check your inbox and spam folder.`
       })
     } else {
-      setAlertMessage({ type: 'error', message: result.error })
+      setAlertMessage({ 
+        type: 'error', 
+        message: result.error || 'Failed to send verification code' 
+      })
     }
     
     setLoading(false)
   }
 
   const handleVerifyOTP = async () => {
-    // 🚨 CRITICAL FIX: Changed from 6 to OTP_LENGTH
+    console.log('🔍 [VERIFY DEBUG] Starting verification...')
+    console.log('🔍 [VERIFY DEBUG] OTP:', otp)
+    console.log('🔍 [VERIFY DEBUG] OTP Length:', otp.length)
+    console.log('🔍 [VERIFY DEBUG] Expected Length:', OTP_LENGTH)
+    
     if (!otp || otp.length !== OTP_LENGTH) {
+      console.log('❌ [VERIFY DEBUG] Invalid OTP length')
       setAlertMessage({ type: 'error', message: `Please enter a valid ${OTP_LENGTH}-character code` })
       return
     }
@@ -101,16 +122,30 @@ export default function Signup() {
     setVerifying(true)
     setAlertMessage(null)
 
+    console.log('📞 [VERIFY DEBUG] Calling verifySignupOTP...')
+    console.time('verifyOTP')
+    
     const result = await verifySignupOTP(signupData.email, otp, signupData.validatedCodeId, signupData.role)
     
+    console.timeEnd('verifyOTP')
+    console.log('✅ [VERIFY DEBUG] Verification result:', result)
+    
     if (result.success) {
+      console.log('🎉 [VERIFY DEBUG] Success! Redirecting...')
       setAlertMessage({
         type: 'success',
-        message: 'Account verified successfully! Redirecting to login...'
+        message: 'Account verified successfully! Redirecting to dashboard...'
       })
-      setTimeout(() => navigate('/login'), 2000)
+      setTimeout(() => {
+        console.log('🔄 [VERIFY DEBUG] Navigating to dashboard...')
+        navigate('/dashboard')
+      }, 2000)
     } else {
-      setAlertMessage({ type: 'error', message: result.error })
+      console.log('❌ [VERIFY DEBUG] Failed:', result.error)
+      setAlertMessage({ 
+        type: 'error', 
+        message: result.error || 'Failed to verify account' 
+      })
     }
     
     setVerifying(false)
@@ -149,7 +184,7 @@ export default function Signup() {
   return (
     <div className="min-h-screen bg-dark flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="card">
+        <div className="card p-8">
           <h1 className="text-3xl font-bold text-primary mb-2">
             {step === 'signup' ? 'Create Account' : 'Verify Email'}
           </h1>
@@ -210,7 +245,7 @@ export default function Signup() {
                     value={registrationCode}
                     onChange={(e) => setRegistrationCode(e.target.value)}
                     placeholder="Enter registration code"
-                    required
+                    required={role === 'worker' || role === 'admin'}
                     className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                   <p className="text-xs text-gray-500 mt-1">
@@ -229,7 +264,7 @@ export default function Signup() {
                     type="password"
                     value={password}
                     onChange={(e) => handlePasswordChange(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="Enter a strong password"
                     required
                     className="w-full pl-10 pr-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
                     autoComplete="new-password"
@@ -268,7 +303,7 @@ export default function Signup() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="Confirm your password"
                     required
                     className="w-full pl-10 pr-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
                     autoComplete="new-password"
@@ -281,13 +316,13 @@ export default function Signup() {
 
               <button
                 type="submit"
-                disabled={loading || !passwordStrength.valid}
+                disabled={loading}
                 className="w-full btn-primary flex items-center justify-center gap-2 mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <>
                     <Loader size={18} className="animate-spin" />
-                    {role === 'customer' ? 'Sending verification code...' : 'Validating code and sending email...'}
+                    Sending verification code...
                   </>
                 ) : (
                   'Continue to Verification'
@@ -303,14 +338,12 @@ export default function Signup() {
                 <h2 className="text-xl font-semibold text-white mb-2">
                   Enter Verification Code
                 </h2>
-                {/* 🚨 UPDATED: Changed "6-digit" to "8-character" */}
                 <p className="text-gray-400">
                   We sent an {OTP_LENGTH}-character code to <span className="font-medium text-white">{signupData.email}</span>
                 </p>
               </div>
 
               <div>
-                {/* 🚨 UPDATED: Changed "6-Digit" to "8-Character" */}
                 <label className="block text-sm font-medium text-gray-300 mb-3 text-center">
                   {OTP_LENGTH}-Character Verification Code
                 </label>
@@ -319,7 +352,7 @@ export default function Signup() {
                     type="text"
                     value={otp}
                     onChange={(e) => handleOtpChange(e.target.value)}
-                    placeholder="12345678"
+                    placeholder="Enter 8-character code"
                     className="w-full px-4 py-3 text-center text-2xl tracking-widest font-mono bg-dark border-2 border-gray-700 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
                     maxLength={OTP_LENGTH}
                     autoFocus
@@ -329,7 +362,6 @@ export default function Signup() {
                   <p className="text-xs text-gray-500">
                     Enter the code from your email
                   </p>
-                  {/* 🚨 UPDATED: Changed "/6 digits" to "/8 characters" */}
                   <p className="text-xs text-gray-500">
                     {otp.length}/{OTP_LENGTH} characters
                   </p>
@@ -348,7 +380,6 @@ export default function Signup() {
                 <button
                   type="button"
                   onClick={handleVerifyOTP}
-                  // 🚨 UPDATED: Changed from 6 to OTP_LENGTH
                   disabled={verifying || otp.length !== OTP_LENGTH}
                   className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

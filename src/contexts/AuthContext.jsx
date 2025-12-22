@@ -22,16 +22,18 @@ export function AuthProvider({ children }) {
         
         if (session?.user) {
           setUser(session.user)
+          // FIXED: Using maybeSingle() instead of single()
           const { data, error } = await supabase
             .from('users')
             .select('role')
             .eq('id', session.user.id)
-            .single()
+            .maybeSingle()
           
           if (error) {
             console.error('Error fetching user role:', error)
             setUserRole('customer')
           } else {
+            // Handle null data case
             setUserRole(data?.role || 'customer')
           }
         }
@@ -51,12 +53,14 @@ export function AuthProvider({ children }) {
         
         if (session?.user) {
           setUser(session.user)
+          // FIXED: Using maybeSingle() instead of single()
           const { data } = await supabase
             .from('users')
             .select('role')
             .eq('id', session.user.id)
-            .single()
+            .maybeSingle()
           
+          // Handle null data case
           setUserRole(data?.role || 'customer')
         } else {
           setUser(null)
@@ -142,8 +146,8 @@ export function AuthProvider({ children }) {
 
       const passwordValidation = validatePassword(password)
       if (!passwordValidation.valid) {
-        console.log('❌ [Request Signup OTP] Password validation failed:', passwordValidation.errors[0])
-        throw new Error(passwordValidation.errors[0])
+        console.log('❌ [Request Signup OTP] Password validation failed:', passwordValidation.errors)
+        throw new Error(passwordValidation.errors.join(', '))
       }
 
       if ((role === 'worker' || role === 'admin') && !registrationCode) {
@@ -205,18 +209,38 @@ export function AuthProvider({ children }) {
 
   const verifySignupOTP = async (email, otp, validatedCodeId, role = 'customer') => {
     console.log('🔐 [Verify OTP] Verifying OTP for:', email)
+    console.log('🔐 [Verify OTP] OTP length:', otp?.length)
     
     try {
-      // Verify the OTP
-      const { data, error } = await supabase.auth.verifyOtp({
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('OTP verification timeout (10s)')), 10000)
+      })
+
+      console.log('🔐 [Verify OTP] Calling supabase.auth.verifyOtp...')
+      
+      // Race between verifyOtp and timeout
+      const verifyPromise = supabase.auth.verifyOtp({
         email: email,
         token: otp,
         type: 'signup'
       })
 
+      const { data, error } = await Promise.race([verifyPromise, timeoutPromise])
+
       if (error) {
         console.error('❌ [Verify OTP] Verification failed:', error)
-        throw new Error('Invalid or expired verification code')
+        
+        // Specific error messages
+        if (error.message?.includes('Invalid OTP')) {
+          throw new Error('Invalid verification code. Please check and try again.')
+        } else if (error.message?.includes('expired')) {
+          throw new Error('Verification code has expired. Please request a new one.')
+        } else if (error.message?.includes('already been used')) {
+          throw new Error('This verification code has already been used. Please request a new one.')
+        } else {
+          throw new Error(`Verification failed: ${error.message}`)
+        }
       }
 
       if (!data.user || !data.session) {
@@ -225,20 +249,29 @@ export function AuthProvider({ children }) {
       }
 
       console.log('✅ [Verify OTP] OTP verified successfully')
+      console.log('👤 [Verify OTP] User ID:', data.user.id)
+      console.log('🔑 [Verify OTP] Session created:', !!data.session)
       
-      // Set the session first
-      // This is the critical step that must be awaited
-      await supabase.auth.setSession({
+      // Immediately set the session
+      console.log('🔄 [Verify OTP] Setting session...')
+      const { error: sessionError } = await supabase.auth.setSession({
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token
       })
 
-      // The user record creation is now handled by the database trigger (on_auth_user_created)
-      // We only need to mark the registration code as used, which is a single, fast update.
+      if (sessionError) {
+        console.error('❌ [Verify OTP] Failed to set session:', sessionError)
+        throw new Error('Failed to create session. Please try logging in.')
+      }
+
+      console.log('✅ [Verify OTP] Session set successfully')
+
+      // Mark registration code as used (non-blocking)
       if (validatedCodeId) {
         console.log('🔄 [Verify OTP] Marking registration code as used...')
-        // Do not await this, let it run in the background to speed up the main flow
-        incrementCodeUsage(validatedCodeId, data.user.id)
+        incrementCodeUsage(validatedCodeId, data.user.id).catch(err => {
+          console.error('⚠️ [Verify OTP] Failed to mark code:', err)
+        })
       }
 
       console.log('🎉 [Verify OTP] Registration completed successfully!')
@@ -251,6 +284,7 @@ export function AuthProvider({ children }) {
       }
     } catch (err) {
       console.error('💥 [Verify OTP] FAILED:', err.message)
+      console.error('💥 [Verify OTP] Full error:', err)
       return { success: false, error: err.message }
     }
   }

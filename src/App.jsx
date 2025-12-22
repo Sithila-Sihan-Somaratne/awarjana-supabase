@@ -8,7 +8,6 @@ import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import NewOrder from './pages/NewOrder'
 import OrderDetails from './pages/OrderDetails'
-import './styles/index.css'
 
 function App() {
   return (
