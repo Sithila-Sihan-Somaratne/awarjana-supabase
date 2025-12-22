@@ -1,4 +1,4 @@
-// src/pages/Signup.jsx - TWO-STEP OTP FLOW
+// src/pages/Signup.jsx
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -6,19 +6,20 @@ import { Alert } from '../components/Alert'
 import { Mail, Lock, User, Loader, Key, ArrowLeft } from 'lucide-react'
 import { validatePassword } from '../lib/crypto'
 
+// Define OTP length constant (Supabase sends 8-character codes)
+const OTP_LENGTH = 8
+
 export default function Signup() {
   const navigate = useNavigate()
   const { requestSignupOTP, verifySignupOTP, resendSignupOTP } = useAuth()
   
-  // Step 1: Signup form state
-  const [step, setStep] = useState('signup') // 'signup' or 'verify'
+  const [step, setStep] = useState('signup')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [role, setRole] = useState('customer')
   const [registrationCode, setRegistrationCode] = useState('')
   
-  // Step 2: OTP verification state
   const [otp, setOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -27,7 +28,6 @@ export default function Signup() {
   const [alertMessage, setAlertMessage] = useState(null)
   const [passwordStrength, setPasswordStrength] = useState({ valid: false, errors: [] })
   
-  // Store data between steps
   const [signupData, setSignupData] = useState({
     email: '',
     password: '',
@@ -42,12 +42,10 @@ export default function Signup() {
     setPasswordStrength(validation)
   }
 
-  // PHASE 1: Handle initial signup and OTP request
   const handleSignupSubmit = async (e) => {
     e.preventDefault()
     setAlertMessage(null)
 
-    // Validation
     if (!passwordStrength.valid) {
       setAlertMessage({ 
         type: 'error', 
@@ -68,11 +66,9 @@ export default function Signup() {
 
     setLoading(true)
 
-    // Request OTP for signup
     const result = await requestSignupOTP(email, password, role, registrationCode)
     
     if (result.success) {
-      // Store data for verification step
       setSignupData({
         email,
         password,
@@ -81,12 +77,12 @@ export default function Signup() {
         validatedCodeId: result.validatedCodeId || null
       })
       
-      // Move to OTP verification step
       setStep('verify')
       setOtpSent(true)
       setAlertMessage({
         type: 'info',
-        message: `A 6-digit verification code has been sent to ${email}. Please check your inbox and enter the code below.`
+        // 🚨 UPDATED: Changed "6-digit" to "8-character"
+        message: `An ${OTP_LENGTH}-character verification code has been sent to ${email}. Please check your inbox.`
       })
     } else {
       setAlertMessage({ type: 'error', message: result.error })
@@ -95,10 +91,10 @@ export default function Signup() {
     setLoading(false)
   }
 
-  // PHASE 2: Handle OTP verification
   const handleVerifyOTP = async () => {
-    if (!otp || otp.length !== 6) {
-      setAlertMessage({ type: 'error', message: 'Please enter a valid 6-digit code' })
+    // 🚨 CRITICAL FIX: Changed from 6 to OTP_LENGTH
+    if (!otp || otp.length !== OTP_LENGTH) {
+      setAlertMessage({ type: 'error', message: `Please enter a valid ${OTP_LENGTH}-character code` })
       return
     }
 
@@ -120,7 +116,6 @@ export default function Signup() {
     setVerifying(false)
   }
 
-  // Handle OTP resend
   const handleResendOTP = async () => {
     setResending(true)
     setAlertMessage(null)
@@ -139,13 +134,12 @@ export default function Signup() {
     setResending(false)
   }
 
-  // Format OTP input (only numbers, max 6 digits)
   const handleOtpChange = (value) => {
     const numbersOnly = value.replace(/\D/g, '')
-    setOtp(numbersOnly.slice(0, 6))
+    // 🚨 CRITICAL FIX: Changed from 6 to OTP_LENGTH
+    setOtp(numbersOnly.slice(0, OTP_LENGTH))
   }
 
-  // Go back to signup form
   const handleBackToSignup = () => {
     setStep('signup')
     setOtp('')
@@ -172,7 +166,6 @@ export default function Signup() {
           )}
 
           {step === 'signup' ? (
-            // STEP 1: SIGNUP FORM
             <form onSubmit={handleSignupSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -243,7 +236,6 @@ export default function Signup() {
                   />
                 </div>
                 
-                {/* Password strength indicator */}
                 {password && (
                   <div className="mt-3 space-y-1">
                     <div className="text-xs font-medium text-gray-400">Password must have:</div>
@@ -303,7 +295,6 @@ export default function Signup() {
               </button>
             </form>
           ) : (
-            // STEP 2: OTP VERIFICATION
             <div className="space-y-6">
               <div className="text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
@@ -312,23 +303,25 @@ export default function Signup() {
                 <h2 className="text-xl font-semibold text-white mb-2">
                   Enter Verification Code
                 </h2>
+                {/* 🚨 UPDATED: Changed "6-digit" to "8-character" */}
                 <p className="text-gray-400">
-                  We sent a 6-digit code to <span className="font-medium text-white">{signupData.email}</span>
+                  We sent an {OTP_LENGTH}-character code to <span className="font-medium text-white">{signupData.email}</span>
                 </p>
               </div>
 
               <div>
+                {/* 🚨 UPDATED: Changed "6-Digit" to "8-Character" */}
                 <label className="block text-sm font-medium text-gray-300 mb-3 text-center">
-                  6-Digit Verification Code
+                  {OTP_LENGTH}-Character Verification Code
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={otp}
                     onChange={(e) => handleOtpChange(e.target.value)}
-                    placeholder="123456"
+                    placeholder="12345678"
                     className="w-full px-4 py-3 text-center text-2xl tracking-widest font-mono bg-dark border-2 border-gray-700 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    maxLength={6}
+                    maxLength={OTP_LENGTH}
                     autoFocus
                   />
                 </div>
@@ -336,8 +329,9 @@ export default function Signup() {
                   <p className="text-xs text-gray-500">
                     Enter the code from your email
                   </p>
+                  {/* 🚨 UPDATED: Changed "/6 digits" to "/8 characters" */}
                   <p className="text-xs text-gray-500">
-                    {otp.length}/6 digits
+                    {otp.length}/{OTP_LENGTH} characters
                   </p>
                 </div>
               </div>
@@ -354,7 +348,8 @@ export default function Signup() {
                 <button
                   type="button"
                   onClick={handleVerifyOTP}
-                  disabled={verifying || otp.length !== 6}
+                  // 🚨 UPDATED: Changed from 6 to OTP_LENGTH
+                  disabled={verifying || otp.length !== OTP_LENGTH}
                   className="flex-1 btn-primary flex items-center justify-center gap-2"
                 >
                   {verifying ? (

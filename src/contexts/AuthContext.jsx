@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.jsx - UPDATED FOR OTP FLOW
+// src/contexts/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { sha256, validatePassword } from '../lib/crypto'
@@ -14,7 +14,6 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
     
-    // Check current session
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -23,7 +22,6 @@ export function AuthProvider({ children }) {
         
         if (session?.user) {
           setUser(session.user)
-          // Fetch user role from database
           const { data, error } = await supabase
             .from('users')
             .select('role')
@@ -47,14 +45,12 @@ export function AuthProvider({ children }) {
 
     checkSession()
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
         
         if (session?.user) {
           setUser(session.user)
-          // Fetch user role
           const { data } = await supabase
             .from('users')
             .select('role')
@@ -75,9 +71,6 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  /**
-   * Validate registration code against database
-   */
   const validateRegistrationCode = async (code, role) => {
     try {
       console.log('🔐 [Code Validation] Starting for role:', role)
@@ -87,10 +80,7 @@ export function AuthProvider({ children }) {
         return { valid: false, message: 'Code and role are required' }
       }
 
-      // Hash the code using SHA-256
       const hashedCode = await sha256(code)
-
-      // CRITICAL FIX: Use maybeSingle() instead of single()
       const { data, error } = await supabase
         .from('registration_codes')
         .select('*')
@@ -108,7 +98,6 @@ export function AuthProvider({ children }) {
         return { valid: false, message: 'Invalid registration code or role mismatch' }
       }
 
-      // Check if code has been used
       if (data.is_used) {
         console.log('⚠️ [Code Validation] Code already used')
         return { valid: false, message: 'Registration code has already been used' }
@@ -122,14 +111,10 @@ export function AuthProvider({ children }) {
     }
   }
 
-  /**
-   * Mark code as used
-   */
   const incrementCodeUsage = async (codeId, userId) => {
     try {
       console.log('🔄 [Code Usage] Marking code as used:', { codeId, userId })
       
-      // Update code as used
       const { error: updateError } = await supabase
         .from('registration_codes')
         .update({ 
@@ -141,7 +126,6 @@ export function AuthProvider({ children }) {
 
       if (updateError) {
         console.error('❌ [Code Usage] Error updating:', updateError)
-        // Don't throw - user is already created
       } else {
         console.log('✅ [Code Usage] Successfully marked as used')
       }
@@ -150,24 +134,18 @@ export function AuthProvider({ children }) {
     }
   }
 
-  /**
-   * PHASE 1: Initial signup request (sends OTP)
-   */
   const requestSignupOTP = async (email, password, role = 'customer', registrationCode = null) => {
     console.log('🚀 [Request Signup OTP] Starting for:', { email, role })
     
     try {
       setError(null)
 
-      // Validate password strength
-      console.log('🔐 [Request Signup OTP] Validating password...')
       const passwordValidation = validatePassword(password)
       if (!passwordValidation.valid) {
         console.log('❌ [Request Signup OTP] Password validation failed:', passwordValidation.errors[0])
         throw new Error(passwordValidation.errors[0])
       }
 
-      // If worker or admin, validate registration code
       if ((role === 'worker' || role === 'admin') && !registrationCode) {
         const msg = `Registration code required for ${role}`
         console.log('❌ [Request Signup OTP]', msg)
@@ -188,15 +166,13 @@ export function AuthProvider({ children }) {
         console.log('✅ [Request Signup OTP] Code validated, ID:', validatedCodeId)
       }
 
-      // IMPORTANT: Set email confirmations to false and use email OTP instead
-      // Sign up with Supabase Auth - this will send OTP email
       console.log('📧 [Request Signup OTP] Sending OTP email...')
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: { role, tempCodeId: validatedCodeId } // Store temp data for later
+          data: { role, tempCodeId: validatedCodeId }
         }
       })
 
@@ -220,15 +196,12 @@ export function AuthProvider({ children }) {
     }
   }
 
-  /**
-   * PHASE 2: Verify OTP and complete registration
-   */
   const verifySignupOTP = async (email, otp, validatedCodeId) => {
     console.log('🔐 [Verify OTP] Verifying OTP for:', email)
     
     try {
-      // Verify the OTP
-      const { data, error } = await supabase.auth.verifyOTP({
+      // 🚨 CRITICAL FIX: Changed from verifyOTP to verifyOtp
+      const { data, error } = await supabase.auth.verifyOtp({
         email: email,
         token: otp,
         type: 'signup'
@@ -241,13 +214,11 @@ export function AuthProvider({ children }) {
 
       console.log('✅ [Verify OTP] OTP verified successfully')
       
-      // Mark registration code as used if applicable
       if (validatedCodeId) {
         console.log('🔄 [Verify OTP] Marking registration code as used...')
         await incrementCodeUsage(validatedCodeId, data.user.id)
       }
 
-      // Auto-login after verification
       await supabase.auth.setSession({
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token
@@ -267,14 +238,10 @@ export function AuthProvider({ children }) {
     }
   }
 
-  /**
-   * Resend OTP
-   */
   const resendSignupOTP = async (email) => {
     console.log('🔄 [Resend OTP] Resending OTP to:', email)
     
     try {
-      // This will trigger a new OTP to be sent
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email: email
@@ -293,7 +260,6 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Keep all other functions (login, logout, etc.) unchanged
   const login = async (email, password) => {
     try {
       setError(null)
@@ -411,11 +377,9 @@ export function AuthProvider({ children }) {
     userRole,
     loading,
     error,
-    // Updated auth functions
     requestSignupOTP,
     verifySignupOTP,
     resendSignupOTP,
-    // Existing functions
     login,
     logout,
     forgotPassword,
