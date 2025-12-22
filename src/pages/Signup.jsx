@@ -101,7 +101,7 @@ export default function Signup() {
     setVerifying(true)
     setAlertMessage(null)
 
-    const result = await verifySignupOTP(signupData.email, otp, signupData.validatedCodeId)
+    const result = await verifySignupOTP(signupData.email, otp, signupData.validatedCodeId, signupData.role)
     
     if (result.success) {
       setAlertMessage({
@@ -287,7 +287,7 @@ export default function Signup() {
                 {loading ? (
                   <>
                     <Loader size={18} className="animate-spin" />
-                    Sending verification code...
+                    {role === 'customer' ? 'Sending verification code...' : 'Validating code and sending email...'}
                   </>
                 ) : (
                   'Continue to Verification'
@@ -350,7 +350,7 @@ export default function Signup() {
                   onClick={handleVerifyOTP}
                   // 🚨 UPDATED: Changed from 6 to OTP_LENGTH
                   disabled={verifying || otp.length !== OTP_LENGTH}
-                  className="flex-1 btn-primary flex items-center justify-center gap-2"
+                  className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {verifying ? (
                     <>
@@ -358,7 +358,7 @@ export default function Signup() {
                       Verifying...
                     </>
                   ) : (
-                    'Verify & Complete'
+                    'Verify Account'
                   )}
                 </button>
               </div>
@@ -373,7 +373,7 @@ export default function Signup() {
                   disabled={resending}
                   className="text-sm text-primary hover:underline font-medium disabled:opacity-50"
                 >
-                  {resending ? 'Sending new code...' : 'Resend verification code'}
+                  {resending ? 'Resending...' : 'Resend verification code'}
                 </button>
                 <p className="text-xs text-gray-500 mt-2">
                   It may take a minute to arrive. Check your spam folder.

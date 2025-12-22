@@ -5,6 +5,15 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    open: true
+    host: '0.0.0.0',
+    open: false,
+    hmr: {
+      clientPort: 3000
+    },
+    allowedHosts: [
+      '.manus.computer',
+      'localhost',
+      '127.0.0.1'
+    ]
   }
 })

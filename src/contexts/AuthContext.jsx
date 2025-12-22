@@ -203,11 +203,11 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const verifySignupOTP = async (email, otp, validatedCodeId) => {
+  const verifySignupOTP = async (email, otp, validatedCodeId, role = 'customer') => {
     console.log('🔐 [Verify OTP] Verifying OTP for:', email)
     
     try {
-      // 🚨 CRITICAL FIX: Changed from verifyOTP to verifyOtp
+      // Verify the OTP
       const { data, error } = await supabase.auth.verifyOtp({
         email: email,
         token: otp,
@@ -219,17 +219,27 @@ export function AuthProvider({ children }) {
         throw new Error('Invalid or expired verification code')
       }
 
-      console.log('✅ [Verify OTP] OTP verified successfully')
-      
-      if (validatedCodeId) {
-        console.log('🔄 [Verify OTP] Marking registration code as used...')
-        await incrementCodeUsage(validatedCodeId, data.user.id)
+      if (!data.user || !data.session) {
+        console.error('❌ [Verify OTP] Missing user or session data after verification:', data)
+        throw new Error('Verification failed. Please try logging in or signing up again.')
       }
 
+      console.log('✅ [Verify OTP] OTP verified successfully')
+      
+      // Set the session first
+      // This is the critical step that must be awaited
       await supabase.auth.setSession({
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token
       })
+
+      // The user record creation is now handled by the database trigger (on_auth_user_created)
+      // We only need to mark the registration code as used, which is a single, fast update.
+      if (validatedCodeId) {
+        console.log('🔄 [Verify OTP] Marking registration code as used...')
+        // Do not await this, let it run in the background to speed up the main flow
+        incrementCodeUsage(validatedCodeId, data.user.id)
+      }
 
       console.log('🎉 [Verify OTP] Registration completed successfully!')
       

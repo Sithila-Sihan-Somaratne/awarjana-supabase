@@ -55,7 +55,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-dark">
       {/* Header */}
       <header className="bg-dark border-b border-gray-700 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-primary">Awarjana Creations</h1>
             <p className="text-sm text-gray-400">
@@ -64,8 +64,8 @@ export default function Dashboard() {
               {userRole === 'admin' && 'Admin Dashboard'}
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-400">{user?.email}</span>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+            <span className="text-sm text-gray-400 truncate max-w-[200px] sm:max-w-none">{user?.email}</span>
             <button
               onClick={handleLogout}
               className="btn-secondary flex items-center gap-2"
@@ -127,7 +127,8 @@ export default function Dashboard() {
         )}
 
         {/* Orders Table */}
-        <div className="card overflow-x-auto">
+        <div className="card">
+          <div className="overflow-x-auto -mx-5 sm:mx-0">
           <h2 className="text-xl font-bold text-white mb-4">Orders</h2>
           
           {loading ? (
@@ -181,6 +182,7 @@ export default function Dashboard() {
               </tbody>
             </table>
           )}
+          </div>
         </div>
       </main>
     </div>

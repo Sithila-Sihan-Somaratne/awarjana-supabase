@@ -6,6 +6,8 @@ import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
+import NewOrder from './pages/NewOrder'
+import OrderDetails from './pages/OrderDetails'
 import './styles/index.css'
 
 function App() {
@@ -27,6 +29,24 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/new-order"
+            element={
+              <ProtectedRoute>
+                <NewOrder />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/order/:id"
+            element={
+              <ProtectedRoute>
+                <OrderDetails />
               </ProtectedRoute>
             }
           />
