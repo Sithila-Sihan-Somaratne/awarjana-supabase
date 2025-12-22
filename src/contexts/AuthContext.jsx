@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { sha256, validatePassword } from '../lib/crypto'
+import { sha256, validatePassword, retryWithBackoff, formatErrorMessage } from '../lib/crypto'
 
 const AuthContext = createContext()
 
@@ -166,15 +166,21 @@ export function AuthProvider({ children }) {
         console.log('✅ [Request Signup OTP] Code validated, ID:', validatedCodeId)
       }
 
-      console.log('📧 [Request Signup OTP] Sending OTP email...')
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: { role, tempCodeId: validatedCodeId }
-        }
-      })
+      console.log('📧 [Request Signup OTP] Sending OTP email with retry logic...')
+      
+      // Use retry logic to handle email service delays
+      const { data: authData, error: authError } = await retryWithBackoff(
+        () => supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: { role, tempCodeId: validatedCodeId }
+          }
+        }),
+        3,  // max retries
+        1000  // initial delay in ms
+      )
 
       if (authError) {
         console.error('❌ [Request Signup OTP] Auth error:', authError)
@@ -191,8 +197,9 @@ export function AuthProvider({ children }) {
       }
     } catch (err) {
       console.error('💥 [Request Signup OTP] FAILED:', err.message)
-      setError(err.message)
-      return { success: false, error: err.message }
+      const formattedError = formatErrorMessage(err)
+      setError(formattedError)
+      return { success: false, error: formattedError }
     }
   }
 
@@ -242,10 +249,15 @@ export function AuthProvider({ children }) {
     console.log('🔄 [Resend OTP] Resending OTP to:', email)
     
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email
-      })
+      // Use retry logic for resend as well
+      const { error } = await retryWithBackoff(
+        () => supabase.auth.resend({
+          type: 'signup',
+          email: email
+        }),
+        3,
+        1000
+      )
 
       if (error) {
         console.error('❌ [Resend OTP] Failed:', error)
@@ -256,7 +268,8 @@ export function AuthProvider({ children }) {
       return { success: true, message: 'New verification code sent!' }
     } catch (err) {
       console.error('💥 [Resend OTP] FAILED:', err.message)
-      return { success: false, error: err.message }
+      const formattedError = formatErrorMessage(err)
+      return { success: false, error: formattedError }
     }
   }
 
@@ -296,16 +309,22 @@ export function AuthProvider({ children }) {
   const forgotPassword = async (email) => {
     try {
       setError(null)
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
+      // Use retry logic for password reset email
+      const { error } = await retryWithBackoff(
+        () => supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        }),
+        3,
+        1000
+      )
 
       if (error) throw error
 
       return { success: true, message: 'Password reset email sent. Check your inbox.' }
     } catch (err) {
-      setError(err.message)
-      return { success: false, error: err.message }
+      const formattedError = formatErrorMessage(err)
+      setError(formattedError)
+      return { success: false, error: formattedError }
     }
   }
 

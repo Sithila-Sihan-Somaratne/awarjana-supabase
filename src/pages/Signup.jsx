@@ -135,9 +135,9 @@ export default function Signup() {
   }
 
   const handleOtpChange = (value) => {
-    const numbersOnly = value.replace(/\D/g, '')
-    // 🚨 CRITICAL FIX: Changed from 6 to OTP_LENGTH
-    setOtp(numbersOnly.slice(0, OTP_LENGTH))
+    // Accept alphanumeric characters (Supabase sends 8-character codes)
+    const alphanumeric = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+    setOtp(alphanumeric.slice(0, OTP_LENGTH))
   }
 
   const handleBackToSignup = () => {

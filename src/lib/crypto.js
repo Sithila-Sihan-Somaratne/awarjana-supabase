@@ -41,3 +41,70 @@ export function validatePassword(password) {
 export function generateResetToken() {
   return crypto.randomUUID();
 }
+
+/**
+ * Retry logic with exponential backoff for email operations
+ * Helps handle Supabase email service delays
+ */
+export async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 1000) {
+  let lastError
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 [Retry] Attempt ${attempt + 1}/${maxRetries + 1}`)
+      return await fn()
+    } catch (error) {
+      lastError = error
+      
+      if (attempt < maxRetries) {
+        const delay = initialDelay * Math.pow(2, attempt)
+        console.log(`⏳ [Retry] Waiting ${delay}ms before retry...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+  
+  console.error('❌ [Retry] All attempts failed:', lastError)
+  throw lastError
+}
+
+/**
+ * Validate email format
+ */
+export function validateEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+/**
+ * Format error message for display
+ */
+export function formatErrorMessage(error) {
+  if (typeof error === 'string') {
+    return error
+  }
+
+  if (error?.message) {
+    const message = error.message.toLowerCase()
+    
+    if (message.includes('invalid login credentials')) {
+      return 'Invalid email or password'
+    }
+    if (message.includes('email not confirmed')) {
+      return 'Please verify your email address first'
+    }
+    if (message.includes('user already registered')) {
+      return 'This email is already registered'
+    }
+    if (message.includes('password')) {
+      return 'Password does not meet requirements'
+    }
+    if (message.includes('network')) {
+      return 'Network error. Please check your connection.'
+    }
+    
+    return error.message
+  }
+
+  return 'An unexpected error occurred. Please try again.'
+}
