@@ -1,67 +1,63 @@
+// src/pages/Signup.jsx
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Alert } from '../components/Alert'
-import { Mail, Lock, User, Loader, Key, ArrowLeft } from 'lucide-react'
+import { Mail, Lock, Loader, Key, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { validatePassword } from '../lib/crypto'
-
-// Define OTP length constant (Supabase sends 8-character codes)
-const OTP_LENGTH = 8
 
 export default function Signup() {
   const navigate = useNavigate()
-  const { requestSignupOTP, verifySignupOTP, resendSignupOTP } = useAuth()
+  const { requestSignupOTP, verifySignupOTP, resendSignupOTP, pendingVerification } = useAuth()
   
   const [step, setStep] = useState('signup')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [role, setRole] = useState('customer')
   const [registrationCode, setRegistrationCode] = useState('')
   
   const [otp, setOtp] = useState('')
-  const [otpSent, setOtpSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [resending, setResending] = useState(false)
   const [alertMessage, setAlertMessage] = useState(null)
   const [passwordStrength, setPasswordStrength] = useState({ valid: false, errors: [] })
   
-  const [signupData, setSignupData] = useState({
-    email: '',
-    password: '',
-    role: 'customer',
-    registrationCode: null,
-    validatedCodeId: null
-  })
+  const [signupData, setSignupData] = useState(null)
 
   const handlePasswordChange = (value) => {
     setPassword(value)
-    const validation = validatePassword(value)
-    console.log('🔐 [PASSWORD DEBUG] Validation result:', validation)
-    setPasswordStrength(validation)
+    setPasswordStrength(validatePassword(value))
+  }
+
+  const getPasswordStrengthScore = (password) => {
+    let score = 0
+    if (password.length >= 8) score++
+    if (/[A-Z]/.test(password)) score++
+    if (/[a-z]/.test(password)) score++
+    if (/[0-9]/.test(password)) score++
+    if (/[!@#$%^&*]/.test(password)) score++
+    return score
+  }
+
+  const getPasswordStrengthColor = (score) => {
+    if (score === 0) return 'bg-gray-700'
+    if (score <= 2) return 'bg-red-500'
+    if (score <= 3) return 'bg-yellow-500'
+    return 'bg-green-500'
   }
 
   const handleSignupSubmit = async (e) => {
     e.preventDefault()
     setAlertMessage(null)
 
-    console.log('🔍 [SIGNUP DEBUG] Form submitted with:', {
-      email,
-      passwordLength: password.length,
-      passwordValid: passwordStrength.valid,
-      passwordErrors: passwordStrength.errors,
-      passwordsMatch: password === confirmPassword,
-      role,
-      registrationCode,
-      shouldRequireCode: (role === 'worker' || role === 'admin')
-    })
-
-    // ENABLE VALIDATION - Critical for production
     if (!passwordStrength.valid) {
       setAlertMessage({ 
         type: 'error', 
-        message: passwordStrength.errors[0] 
+        message: passwordStrength.errors[0] || 'Please fix password errors'
       })
       return
     }
@@ -78,24 +74,23 @@ export default function Signup() {
 
     setLoading(true)
 
-    const result = await requestSignupOTP(email, password, role, registrationCode)
-    
-    console.log('📬 [SIGNUP DEBUG] API response:', result)
+    const result = await requestSignupOTP(
+      email, 
+      password, 
+      role, 
+      role !== 'customer' ? registrationCode : null
+    )
     
     if (result.success) {
-      setSignupData({
-        email,
-        password,
+      setSignupData({ 
+        email, 
         role,
-        registrationCode: (role === 'worker' || role === 'admin') ? registrationCode : null,
-        validatedCodeId: result.validatedCodeId || null
+        validatedCodeId: result.validatedCodeId 
       })
-      
       setStep('verify')
-      setOtpSent(true)
       setAlertMessage({
-        type: 'info',
-        message: `An ${OTP_LENGTH}-character verification code has been sent to ${email}. Please check your inbox and spam folder.`
+        type: 'success',
+        message: result.message || 'Verification code sent! Please check your email.'
       })
     } else {
       setAlertMessage({ 
@@ -108,40 +103,28 @@ export default function Signup() {
   }
 
   const handleVerifyOTP = async () => {
-    console.log('🔍 [VERIFY DEBUG] Starting verification...')
-    console.log('🔍 [VERIFY DEBUG] OTP:', otp)
-    console.log('🔍 [VERIFY DEBUG] OTP Length:', otp.length)
-    console.log('🔍 [VERIFY DEBUG] Expected Length:', OTP_LENGTH)
-    
-    if (!otp || otp.length !== OTP_LENGTH) {
-      console.log('❌ [VERIFY DEBUG] Invalid OTP length')
-      setAlertMessage({ type: 'error', message: `Please enter a valid ${OTP_LENGTH}-character code` })
+    if (!otp || otp.length < 6) {
+      setAlertMessage({ type: 'error', message: 'Please enter a valid verification code (at least 6 digits)' })
       return
     }
 
     setVerifying(true)
     setAlertMessage(null)
 
-    console.log('📞 [VERIFY DEBUG] Calling verifySignupOTP...')
-    console.time('verifyOTP')
+    const emailToVerify = signupData?.email || pendingVerification?.email || email
+    const validatedCodeId = signupData?.validatedCodeId || pendingVerification?.validatedCodeId
     
-    const result = await verifySignupOTP(signupData.email, otp, signupData.validatedCodeId, signupData.role)
-    
-    console.timeEnd('verifyOTP')
-    console.log('✅ [VERIFY DEBUG] Verification result:', result)
+    const result = await verifySignupOTP(emailToVerify, otp, validatedCodeId)
     
     if (result.success) {
-      console.log('🎉 [VERIFY DEBUG] Success! Redirecting...')
       setAlertMessage({
         type: 'success',
-        message: 'Account verified successfully! Redirecting to dashboard...'
+        message: result.message || 'Account verified successfully!'
       })
       setTimeout(() => {
-        console.log('🔄 [VERIFY DEBUG] Navigating to dashboard...')
         navigate('/dashboard')
-      }, 2000)
+      }, 1500)
     } else {
-      console.log('❌ [VERIFY DEBUG] Failed:', result.error)
       setAlertMessage({ 
         type: 'error', 
         message: result.error || 'Failed to verify account' 
@@ -155,12 +138,13 @@ export default function Signup() {
     setResending(true)
     setAlertMessage(null)
 
-    const result = await resendSignupOTP(signupData.email)
+    const emailToResend = signupData?.email || pendingVerification?.email || email
+    const result = await resendSignupOTP(emailToResend)
     
     if (result.success) {
       setAlertMessage({
         type: 'info',
-        message: 'New verification code sent! Please check your email.'
+        message: result.message || 'New verification code sent!'
       })
     } else {
       setAlertMessage({ type: 'error', message: result.error })
@@ -170,9 +154,8 @@ export default function Signup() {
   }
 
   const handleOtpChange = (value) => {
-    // Accept alphanumeric characters (Supabase sends 8-character codes)
-    const alphanumeric = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
-    setOtp(alphanumeric.slice(0, OTP_LENGTH))
+    const digits = value.replace(/[^0-9]/g, '')
+    setOtp(digits)
   }
 
   const handleBackToSignup = () => {
@@ -245,7 +228,7 @@ export default function Signup() {
                     value={registrationCode}
                     onChange={(e) => setRegistrationCode(e.target.value)}
                     placeholder="Enter registration code"
-                    required={role === 'worker' || role === 'admin'}
+                    required
                     className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                   <p className="text-xs text-gray-500 mt-1">
@@ -261,19 +244,43 @@ export default function Signup() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 text-gray-500" size={18} />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => handlePasswordChange(e.target.value)}
                     placeholder="Enter a strong password"
                     required
-                    className="w-full pl-10 pr-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="w-full pl-10 pr-10 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
                     autoComplete="new-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 text-gray-500 hover:text-gray-300"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
                 
                 {password && (
                   <div className="mt-3 space-y-1">
-                    <div className="text-xs font-medium text-gray-400">Password must have:</div>
+                    {/* Password strength meter */}
+                    <div className="mb-2">
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map(i => (
+                          <div 
+                            key={i}
+                            className={`h-1 flex-1 rounded ${
+                              getPasswordStrengthScore(password) >= i 
+                                ? getPasswordStrengthColor(getPasswordStrengthScore(password))
+                                : 'bg-gray-700'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Password requirements */}
+                    <div className="text-xs font-medium text-gray-400 mb-1">Password must have:</div>
                     <div className={`text-xs ${password.length >= 8 ? 'text-success' : 'text-gray-500'}`}>
                       ✓ At least 8 characters
                     </div>
@@ -300,14 +307,21 @@ export default function Signup() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 text-gray-500" size={18} />
                   <input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm your password"
                     required
-                    className="w-full pl-10 pr-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="w-full pl-10 pr-10 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
                     autoComplete="new-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-3 text-gray-500 hover:text-gray-300"
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
                 {confirmPassword && password !== confirmPassword && (
                   <p className="text-xs text-error mt-1">Passwords do not match</p>
@@ -322,7 +336,7 @@ export default function Signup() {
                 {loading ? (
                   <>
                     <Loader size={18} className="animate-spin" />
-                    Sending verification code...
+                    Creating Account...
                   </>
                 ) : (
                   'Continue to Verification'
@@ -336,34 +350,40 @@ export default function Signup() {
                   <Key className="text-primary" size={32} />
                 </div>
                 <h2 className="text-xl font-semibold text-white mb-2">
-                  Enter Verification Code
+                  Check Your Email
                 </h2>
                 <p className="text-gray-400">
-                  We sent an {OTP_LENGTH}-character code to <span className="font-medium text-white">{signupData.email}</span>
+                  Enter the verification code sent to <span className="font-medium text-white">
+                    {signupData?.email || pendingVerification?.email || email}
+                  </span>
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Check your email for the verification code from Supabase
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-3 text-center">
-                  {OTP_LENGTH}-Character Verification Code
+                  Verification Code
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={otp}
                     onChange={(e) => handleOtpChange(e.target.value)}
-                    placeholder="Enter 8-character code"
+                    placeholder="Enter verification code"
                     className="w-full px-4 py-3 text-center text-2xl tracking-widest font-mono bg-dark border-2 border-gray-700 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    maxLength={OTP_LENGTH}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     autoFocus
                   />
                 </div>
                 <div className="flex justify-between mt-2">
                   <p className="text-xs text-gray-500">
-                    Enter the code from your email
+                    Enter digits only (0-9)
                   </p>
                   <p className="text-xs text-gray-500">
-                    {otp.length}/{OTP_LENGTH} characters
+                    {otp.length} digits
                   </p>
                 </div>
               </div>
@@ -380,7 +400,7 @@ export default function Signup() {
                 <button
                   type="button"
                   onClick={handleVerifyOTP}
-                  disabled={verifying || otp.length !== OTP_LENGTH}
+                  disabled={verifying || otp.length < 6}
                   className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {verifying ? (

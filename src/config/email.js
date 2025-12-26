@@ -1,8 +1,10 @@
+// src/config/email.js
 /**
  * Email Configuration
  * Settings for handling Supabase email delivery
  */
 
+// Create the main config object
 export const EMAIL_CONFIG = {
   // Retry settings for email operations
   RETRY_ATTEMPTS: 3,
@@ -16,7 +18,7 @@ export const EMAIL_CONFIG = {
   
   // OTP settings
   OTP_LENGTH: 8,
-  OTP_EXPIRY: 24 * 60 * 60 * 1000, // 24 hours
+  OTP_EXPIRY: 15 * 60 * 1000, // 15 minutes (changed from 24 hours)
   OTP_RESEND_COOLDOWN: 60000, // 1 minute between resends
   
   // Email validation
@@ -34,19 +36,13 @@ export const EMAIL_CONFIG = {
   }
 }
 
-/**
- * Check if email delivery is likely to be slow
- * Returns true if it's peak hours or known slow period
- */
+// Helper functions as named exports
 export function isLikelySlowEmailPeriod() {
   const hour = new Date().getHours()
   // Email delivery is often slower during peak hours (9-17)
   return hour >= 9 && hour <= 17
 }
 
-/**
- * Get recommended retry delay based on time of day
- */
 export function getRecommendedRetryDelay() {
   if (isLikelySlowEmailPeriod()) {
     return 2000 // 2 seconds during peak hours
