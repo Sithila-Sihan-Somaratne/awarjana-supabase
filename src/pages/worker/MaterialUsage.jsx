@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
-  ArrowLeft, Package, Tool, CheckCircle, AlertCircle,
+  ArrowLeft, Package, Wrench, CheckCircle, AlertCircle,
   Save, XCircle, Calculator, Plus, Search
 } from 'lucide-react'
 import Alert from '../../components/common/Alert'

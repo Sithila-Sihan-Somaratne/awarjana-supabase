@@ -253,4 +253,4 @@ export function EmailVerification() {
       </div>
     </div>
   )
-}
+}export default EmailVerification

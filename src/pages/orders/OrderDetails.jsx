@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import {
   ArrowLeft, Package, User, Calendar, DollarSign,
   Ruler, Clock, CheckCircle, AlertCircle, Edit,
-  Printer, Download, MessageSquare, FileText, Tool,
+  Printer, Download, MessageSquare, FileText, Wrench,
   Users, TrendingUp, XCircle, Eye
 } from 'lucide-react'
 import Alert from '../../components/common/Alert'

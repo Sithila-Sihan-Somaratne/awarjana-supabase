@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
-  ClipboardCheck, Tool, AlertTriangle, Calendar, Package,
+  ClipboardCheck, Wrench, AlertTriangle, Calendar, Package,
   Clock, CheckCircle, Users, BarChart3, Plus, Filter, Download
 } from 'lucide-react'
 import Alert from '../../components/common/Alert'
