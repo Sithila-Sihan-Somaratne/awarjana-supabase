@@ -5,7 +5,6 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-import EmailVerification from './pages/EmailVerification'
 import Unauthorized from './pages/Unauthorized'
 
 // Dashboard Components
@@ -48,7 +47,6 @@ function App() {
               <ResetPassword />
             </ProtectedRoute>
           } />
-          <Route path="/verify-email" element={<EmailVerification />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           
           {/* Main Dashboard Route - Role-based redirection */}

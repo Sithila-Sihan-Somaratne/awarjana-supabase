@@ -74,19 +74,12 @@ export function AuthProvider({ children }) {
         return { valid: false, message: "Code and role are required" };
       }
 
-      console.log("🔍 [DEBUG - START] Validating Code:");
-      console.log("   Input Code (Raw):", `"${code}"`);
-      console.log("   Input Role (Raw):", `"${role}"`);
+      console.log("🔍 [DEBUG] Validating Code:", code, "Role:", role);
 
       const hashedCode = await hashString(code);
-      console.log("   Hashed Code:", hashedCode);
-      console.log("   Role (for DB query):", `"${role}"`);
+      console.log("📊 Hashed Code:", hashedCode);
 
-      // Log the actual Supabase query being built
-      console.log("   🛠️  Executing DB Query with:");
-      console.log('     .eq("code",', `"${hashedCode}")`);
-      console.log('     .eq("role",', `"${role}")`);
-
+      // SIMPLE DIRECT QUERY - no complex chaining
       const { data, error } = await supabase
         .from("registration_codes")
         .select("*")
@@ -94,15 +87,15 @@ export function AuthProvider({ children }) {
         .eq("role", role)
         .maybeSingle();
 
-      console.log("   📊 Query Result:", data);
-      console.log("   ❌ Query Error:", error);
-      console.log("   🔚 [DEBUG - END]");
+      console.log("✅ Query completed. Data:", data, "Error:", error);
+
       if (error) {
-        console.error("Validation error:", error);
+        console.error("❌ Database error:", error);
         return { valid: false, message: "Database error during validation" };
       }
 
       if (!data) {
+        console.log("❌ No matching code found");
         return {
           valid: false,
           message: "Invalid registration code or role mismatch",
@@ -110,15 +103,17 @@ export function AuthProvider({ children }) {
       }
 
       if (data.is_used) {
+        console.log("❌ Code already used");
         return {
           valid: false,
           message: "Registration code has already been used",
         };
       }
 
+      console.log("✅ Code validation successful!");
       return { valid: true, codeData: data };
     } catch (err) {
-      console.error("Validation error:", err);
+      console.error("🔥 Unexpected error:", err);
       return { valid: false, message: "Error validating code" };
     }
   };
@@ -183,7 +178,7 @@ export function AuthProvider({ children }) {
         throw authError;
       }
 
-      // Store user in public.users table
+      // Store user in public.users table (using upsert to handle both insert and update)
       if (data.user) {
         const { error: upsertError } = await supabase
           .from("users")
@@ -268,12 +263,11 @@ export function AuthProvider({ children }) {
         throw new Error("Verification failed. Please try again.");
       }
 
-      // Update user verification status
+      // Update user verification status in public.users table
       const { error: updateError } = await supabase
         .from("users")
         .update({
           email_verified: true,
-          verified_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("email", email.toLowerCase().trim());
@@ -284,6 +278,9 @@ export function AuthProvider({ children }) {
 
       // Clear pending verification
       setPendingVerification(null);
+
+      // Update local state
+      await handleUserSession(data.user);
 
       return {
         success: true,
@@ -336,6 +333,9 @@ export function AuthProvider({ children }) {
       });
 
       if (error) throw error;
+
+      // Update local state
+      await handleUserSession(data.user);
 
       return { success: true, user: data.user };
     } catch (err) {
