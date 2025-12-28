@@ -116,11 +116,7 @@ Before testing the app, verify:
 
 ### Error: "Missing Supabase environment variables"
 
-**Solution**: Make sure `.env` file exists with:
-```
-VITE_SUPABASE_URL=https://yqqzdkhelrzxhniygoxd.supabase.co
-VITE_SUPABASE_ANON_KEY=your_anon_key
-```
+**Solution**: Make sure `.env` file exists.```
 
 ### Error: "relation 'users' does not exist"
 

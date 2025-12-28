@@ -136,11 +136,7 @@ awarjana-supabase/
 
 ## Environment Variables
 
-**Required (Only 2!):**
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+**Required variables (Only 2!)**
 
 Get these from your Supabase project settings at https://app.supabase.com
 
@@ -191,8 +187,6 @@ pnpm build
    - Netlify auto-detects settings from `netlify.toml`
 
 3. **Set Environment Variables**
-   - Add `VITE_SUPABASE_URL`
-   - Add `VITE_SUPABASE_ANON_KEY`
 
 4. **Deploy**
    - Click "Deploy site"

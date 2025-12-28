@@ -65,11 +65,7 @@ A modern, production-ready web application for managing photoframe orders, inven
 
 3. **Configure Environment Variables**
    
-   Create a `.env` file in the root directory:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_project_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
+   Create a `.env` file in the root directory with needed variables.
 
 4. **Set Up Database Schema**
    
@@ -172,9 +168,7 @@ The project includes a complete `netlify.toml` configuration:
    - Netlify will auto-detect settings from `netlify.toml`
 
 3. **Set Environment Variables**
-   In Netlify dashboard, add:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
+   In Netlify dashboard, add the environment variables needed.
 
 4. **Deploy**
    - Click "Deploy site"

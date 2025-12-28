@@ -59,21 +59,8 @@ If not auto-detected, the `netlify.toml` file will handle it.
 **CRITICAL**: Add your Supabase credentials to Netlify!
 
 1. In Netlify, go to **Site settings** → **Environment variables**
-2. Click **"Add a variable"** and add:
-
-   ```
-   Key: VITE_SUPABASE_URL
-   Value: https://yqqzdkhelrzxhniygoxd.supabase.co
-   ```
-
-3. Click **"Add a variable"** again:
-
-   ```
-   Key: VITE_SUPABASE_ANON_KEY
-   Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxcXpka2hlbHJ6eGhuaXlnb3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyMTYwMTksImV4cCI6MjA4MTc5MjAxOX0.rQCFQZcPw0Y6tOQc-XUNJ6N1ZVjzHY3GONTnLY6OFAQ
-   ```
-
-4. Click **"Save"**
+2. Click **"Add a variable"** and add url and then again to add key.
+3. Click **"Save"**
 
 ### Step 5: Deploy!
 

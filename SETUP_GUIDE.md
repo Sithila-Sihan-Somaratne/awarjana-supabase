@@ -44,12 +44,7 @@ Copy `.env.example` to `.env`:
 cp .env.example .env
 ```
 
-Edit `.env` with your Supabase credentials:
-
-```env
-VITE_SUPABASE_URL=https://yqqzdkhelrzxhniygoxd.supabase.co
-VITE_SUPABASE_ANON_KEY=your_anon_key_here
-```
+Edit `.env` with your Supabase credentials.
 
 ### Step 4: Start Development Server
 
@@ -74,8 +69,8 @@ Open http://localhost:5173 in your browser.
 
 1. Go to **Settings** → **API**
 2. Copy:
-   - **Project URL** → `VITE_SUPABASE_URL`
-   - **anon public key** → `VITE_SUPABASE_ANON_KEY`
+   - **Project URL** → `USED URL`
+   - **anon public key** → `KNOWN KEY`
 3. Paste into `.env` file
 
 ### Step 3: Configure Email
@@ -147,11 +142,7 @@ node -e "console.log(require('crypto').createHash('sha256').update('your-code-he
 
 ### Required Variables
 
-```env
-# Supabase
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your_anon_key_here
-```
+Add them, remember!
 
 ### Optional Variables
 
@@ -240,11 +231,7 @@ If not, set manually in **Site settings** → **Build & deploy** → **Build set
 ### Step 4: Add Environment Variables
 
 1. Go to **Site settings** → **Build & deploy** → **Environment**
-2. Add variables:
-   ```
-   VITE_SUPABASE_URL=https://your-project.supabase.co
-   VITE_SUPABASE_ANON_KEY=your_anon_key_here
-   ```
+2. Add enviroment variables.
 3. Click "Deploy site"
 
 ### Step 5: Update Supabase CORS

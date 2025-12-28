@@ -19,9 +19,7 @@
 - [ ] Test email delivery
 
 ### 3. Environment Variables
-- [ ] `VITE_SUPABASE_URL` set in Netlify
-- [ ] `VITE_SUPABASE_ANON_KEY` set in Netlify
-- [ ] Verify variables are correct
+- [ ] Verify variables are correct and ser in Netlify
 
 ### 4. Code Review
 - [x] All admin features completed
@@ -48,8 +46,6 @@ git push origin main
   - Node version: 20.11.0
 
 ### 3. Add Environment Variables
-- [ ] Add `VITE_SUPABASE_URL`
-- [ ] Add `VITE_SUPABASE_ANON_KEY`
 
 ### 4. Deploy
 - [ ] Trigger manual deploy

@@ -130,11 +130,7 @@ Dark Mode:
 
 ### 📝 Environment Variables
 
-Now only requires 2 variables:
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+Now only requires 2 variables: url and key.
 
 ### 🎯 What's Next?
 
