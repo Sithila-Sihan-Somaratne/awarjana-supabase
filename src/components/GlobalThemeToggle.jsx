@@ -1,7 +1,7 @@
 import { Sun, Moon } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
-export default function GlobalThemeToggle() {
+export function GlobalThemeToggle() {
   const { theme, toggleTheme } = useTheme()
 
   return (

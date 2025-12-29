@@ -6,7 +6,8 @@ import { supabase } from '../../lib/supabase'
 import {
   ArrowLeft, Save, Calculator, Package, Ruler,
   DollarSign, AlertCircle, CheckCircle, XCircle
-} from 'lucide-react'import Alert from '../components/common/Alert'
+} from 'lucide-react'
+import Alert from '../../components/ui/Alert'
 
 export default function NewOrder() {
   const navigate = useNavigate()

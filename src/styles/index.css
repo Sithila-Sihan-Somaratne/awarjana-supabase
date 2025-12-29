@@ -75,39 +75,42 @@
   @apply w-full px-4 py-2 bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/50 transition-all;
 }
 
-/* Ensure contrast on all components */
+/* FIX: We use 'color: theme(...)' instead of '@apply' for utility overrides 
+  to prevent the "Circular Dependency" error in PostCSS.
+*/
+
 .dark .bg-white {
-  @apply bg-dark-lighter !important;
+  background-color: theme('colors.dark-lighter', #1a1a1a) !important;
 }
 
 .dark .bg-gray-50 {
-  @apply bg-dark !important;
+  background-color: theme('colors.black') !important;
 }
 
 .dark .text-gray-900 {
-  @apply text-white !important;
+  color: theme('colors.white') !important;
 }
 
 .dark .text-gray-800 {
-  @apply text-gray-100 !important;
+  color: theme('colors.gray.100') !important;
 }
 
 .dark .text-gray-700 {
-  @apply text-gray-200 !important;
+  color: theme('colors.gray.200') !important;
 }
 
 .dark .text-gray-600 {
-  @apply text-gray-400 !important;
+  color: theme('colors.gray.400') !important;
 }
 
 .dark .text-gray-500 {
-  @apply text-gray-400 !important;
+  color: theme('colors.gray.400') !important;
 }
 
 .dark .border-gray-100,
 .dark .border-gray-200,
 .dark .border-gray-300 {
-  @apply border-dark-border !important;
+  border-color: theme('colors.dark-border', #333) !important;
 }
 
 .dark .shadow-sm,
@@ -115,20 +118,23 @@
 .dark .shadow-md,
 .dark .shadow-lg,
 .dark .shadow-xl {
-  @apply shadow-none !important;
-  border: 1px solid theme('colors.dark.border');
+  box-shadow: none !important;
+  border: 1px solid theme('colors.dark-border', #333);
 }
 
 /* Sidebar specific dark mode */
 .dark .bg-gray-900 {
-  @apply bg-black !important;
+  background-color: black !important;
 }
 
 /* Input fields in dark mode */
 .dark input, .dark select, .dark textarea {
-  @apply bg-dark border-dark-border text-white !important;
+  background-color: black !important;
+  border-color: theme('colors.dark-border', #333) !important;
+  color: white !important;
 }
 
 .dark input::placeholder {
-  @apply text-gray-600 !important;
+  /* Using the raw theme color value fixes the circular dependency error */
+  color: theme('colors.gray.600') !important;
 }

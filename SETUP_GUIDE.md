@@ -1,34 +1,72 @@
-# Complete Setup & Deployment Guide
+# AWARJANA CREATIONS - COMPLETE SETUP GUIDE
 
-## Table of Contents
+## What's New in This Version
 
-1. [Local Development Setup](#local-development-setup)
-2. [Supabase Configuration](#supabase-configuration)
-3. [Database Setup](#database-setup)
-4. [Environment Variables](#environment-variables)
-5. [Testing](#testing)
-6. [Deployment to Netlify](#deployment-to-netlify)
-7. [Troubleshooting](#troubleshooting)
+### 🚀 Major Features Implemented
+
+#### 1. Credit System (Max 10 Credits)
+- **Credits Table**: Tracks user credits with `credits_remaining` and `total_credits_used`
+- **Credit Usage Table**: Detailed tracking of all credit-consuming actions
+- **API Keys Table**: Manage multiple API keys with individual credit pools
+- **Slow Consumption**: Credits are consumed slowly (0.1 per order, 0.05 per update, etc.)
+- **Low Credit Notifications**: Automatic warnings at 5, 3, and 1 credits remaining
+
+#### 2. Dark/Light Mode Toggle
+- Fully integrated with Tailwind CSS
+- System preference detection
+- Persistent theme storage
+- Global floating toggle button
+- Proper CSS variable handling
+
+#### 3. Email Sending via Supabase
+- OTP email verification
+- Password reset emails
+- Low credit warning emails
+- Order confirmation emails
+- Development mode with OTP simulation
+
+#### 4. Shadcn UI Components
+- Button, Card, Input, Label
+- Alert (with variants)
+- Dialog (modal)
+- Toast (notifications)
+- All components with dark mode support
+
+#### 5. Debug Panel (Development Only)
+- Real-time credit status
+- Test OTP management
+- Quick credit consumption buttons
+- Environment information
 
 ---
 
-## Local Development Setup
+## 📋 Quick Setup Instructions
 
-### Prerequisites
+### Step 1: Run Database Setup
 
-- Node.js 16+ (check with `node --version`)
-- npm or pnpm (we use pnpm)
-- Git
-- Supabase account (free at https://supabase.com)
+1. Go to your Supabase SQL Editor
+2. Copy and paste the contents of `database_setup.sql`
+3. Run the entire script
 
-### Step 1: Clone Repository
+This will:
+- Drop existing tables (clean start)
+- Create all new tables including credits, api_keys, credit_usage
+- Create the admin_code_usage_stats view
+- Add RLS policies for security
+- Insert sample materials data
+- Create helper functions
 
-```bash
-git clone https://github.com/Sithila-Sihan-Somaratne/awarjana-supabase.git
-cd awarjana-supabase
+### Step 2: Configure Environment Variables
+
+Create a `.env.local` file in the project root:
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_DEV_MODE=true
 ```
 
-### Step 2: Install Dependencies
+### Step 3: Install Dependencies
 
 ```bash
 pnpm install
@@ -36,384 +74,255 @@ pnpm install
 npm install
 ```
 
-### Step 3: Create .env File
-
-Copy `.env.example` to `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your Supabase credentials.
-
 ### Step 4: Start Development Server
 
 ```bash
 pnpm dev
-```
-
-Open http://localhost:5173 in your browser.
-
----
-
-## Supabase Configuration
-
-### Step 1: Create Supabase Project
-
-1. Go to https://supabase.com/dashboard
-2. Click "New Project"
-3. Fill in project details
-4. Wait for project to initialize (2-3 minutes)
-
-### Step 2: Get API Keys
-
-1. Go to **Settings** → **API**
-2. Copy:
-   - **Project URL** → `USED URL`
-   - **anon public key** → `KNOWN KEY`
-3. Paste into `.env` file
-
-### Step 3: Configure Email
-
-1. Go to **Authentication** → **Email**
-2. Enable "Confirm email"
-3. Set expiry to 24 hours
-4. Go to **Email Templates**
-5. Customize templates (optional)
-
-### Step 4: Set Up CORS
-
-1. Go to **Settings** → **API**
-2. Scroll to "CORS"
-3. Add your domains:
-   - `http://localhost:5173` (local)
-   - `http://localhost:3000` (if using port 3000)
-   - `https://yourdomain.com` (production)
-
----
-
-## Database Setup
-
-### Step 1: Create Tables
-
-1. Go to Supabase Dashboard
-2. Click **SQL Editor**
-3. Click **New Query**
-4. Copy and paste SQL from `database-setup.sql`
-5. Click **Run**
-
-### Step 2: Verify Tables
-
-Run this query to verify:
-
-```sql
-SELECT table_name FROM information_schema.tables 
-WHERE table_schema = 'public';
-```
-
-You should see:
-- `users`
-- `registration_codes`
-- `code_usage_logs`
-- `password_reset_logs`
-
-### Step 3: Insert Registration Codes
-
-```sql
--- Admin code (change to your own!)
-INSERT INTO registration_codes (code, role, is_used) VALUES
-  ('8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 'admin', false);
-
--- Worker code (change to your own!)
-INSERT INTO registration_codes (code, role, is_used) VALUES
-  ('5e884898da28047151d0e56f8dc62927e8d0686b1b9f4b1b9b6b8d8c8d8c8d8c', 'worker', false);
-```
-
-**To generate your own codes:**
-
-```bash
-# Using Node.js
-node -e "console.log(require('crypto').createHash('sha256').update('your-code-here').digest('hex'))"
+# or
+npm run dev
 ```
 
 ---
 
-## Environment Variables
+## 💳 Credit System Details
 
-### Required Variables
+### Credit Consumption Rates
 
-Add them, remember!
+| Action | Credits Consumed |
+|--------|-----------------|
+| Order Create | 0.10 (1 per 10 orders) |
+| Order Update | 0.05 (1 per 20 updates) |
+| Draft Submit | 0.05 (1 per 20 drafts) |
+| Material View | 0.01 (1 per 100 views) |
+| Report Generate | 0.10 (1 per 10 reports) |
+| API Call | 0.01 (1 per 100 calls) |
+| Email Sent | 0.02 (1 per 50 emails) |
+| Login | 0.001 (1 per 1000 logins) |
 
-### Optional Variables
+### Low Credit Thresholds
 
+| Status | Credits Remaining | Action |
+|--------|------------------|--------|
+| Healthy | > 5 | Normal operation |
+| Warning | ≤ 5 | Informational notice |
+| Low | ≤ 3 | Warning notification |
+| Critical | ≤ 1 | Urgent action required |
+
+### API Key Management
+
+Users can:
+- Generate new API keys (10 credits each)
+- View all their API keys
+- Deactivate old keys
+- Track usage per key
+
+---
+
+## 🎨 Theme System
+
+### CSS Variables (for Shadcn UI)
+
+The theme system uses CSS variables that are automatically updated:
+
+**Light Mode:**
+```css
+--background: 0 0% 100%
+--foreground: 0 0% 0%
+--primary: 45 100% 50% (Yellow)
+--card: 0 0% 100%
+--border: 0 0% 80%
+```
+
+**Dark Mode:**
+```css
+--background: 0 0% 0%
+--foreground: 0 0% 100%
+--primary: 45 100% 50% (Yellow)
+--card: 0 0% 4%
+--border: 0 0% 15%
+```
+
+### Usage in Components
+
+```jsx
+import { useTheme } from './contexts/ThemeContext';
+
+function MyComponent() {
+  const { theme, toggleTheme } = useTheme();
+  
+  return (
+    <button onClick={toggleTheme}>
+      Current: {theme}
+    </button>
+  );
+}
+```
+
+---
+
+## 📧 Email System
+
+### Development Mode
+In development mode, OTPs are stored in localStorage for testing:
+- Check browser console for OTP logs
+- View test OTPs in the Debug Panel
+- OTPs expire after 15 minutes
+
+### Production Mode
+In production, emails are sent via:
+1. Supabase Auth (built-in OTP)
+2. Custom Edge Functions (for custom templates)
+3. External email service (Resend, SendGrid, etc.)
+
+---
+
+## 🏗️ Project Structure
+
+```
+src/
+├── components/
+│   ├── common/
+│   │   ├── CreditWarningBanner.jsx
+│   │   ├── CreditDisplay.jsx
+│   │   ├── DebugPanel.jsx
+│   │   ├── ProtectedRoute.jsx
+│   │   └── ...
+│   └── ui/
+│       ├── Button.jsx
+│       ├── Card.jsx
+│       ├── Input.jsx
+│       ├── Label.jsx
+│       ├── Alert.jsx
+│       ├── Dialog.jsx
+│       └── Toast.jsx
+├── contexts/
+│   ├── AuthContext.jsx
+│   ├── ThemeContext.jsx
+│   └── CreditContext.jsx
+├── lib/
+│   ├── supabase.js
+│   ├── costCalculator.js
+│   ├── email.js
+│   ├── utils.js
+│   └── creditConfig.js
+├── pages/
+│   ├── dashboard/
+│   ├── orders/
+│   ├── worker/
+│   └── admin/
+└── App.jsx
+```
+
+---
+
+## 🔧 Key Files Modified
+
+| File | Purpose |
+|------|---------|
+| `database_setup.sql` | Complete database schema with credits |
+| `src/App.jsx` | Routing with CreditProvider & ToastProvider |
+| `src/contexts/CreditContext.jsx` | Credit management logic |
+| `src/contexts/ThemeContext.jsx` | Dark/light mode handling |
+| `src/lib/email.js` | Email sending functionality |
+| `src/lib/costCalculator.js` | Cost calculations in LKR |
+| `src/lib/utils.js` | Utility functions & credit status |
+| `src/components/ui/*` | Shadcn UI components |
+| `src/components/common/CreditWarningBanner.jsx` | Low credit warnings |
+| `src/components/common/CreditDisplay.jsx` | Credit status display |
+| `src/components/common/DebugPanel.jsx` | Development debug tools |
+| `src/components/common/ProtectedRoute.jsx` | Route protection with credits |
+
+---
+
+## 💰 Currency Configuration
+
+All costs are displayed in **LKR (Sri Lankan Rupees)**:
+
+```javascript
+// Format: Rs. 1,234.56
+formatLKR(1234.56)
+
+// In cost calculator
+const { total } = calculateOrderCost(width, height);
+// total is in LKR
+```
+
+---
+
+## 🔐 RLS Policies
+
+The database includes comprehensive Row Level Security policies:
+
+- **Users**: Can view/edit own profile; Admins can view/edit all
+- **API Keys**: Users can manage their own; Admins can view all
+- **Credits**: Users can view their own; Admins can view all
+- **Credit Usage**: Users can view their own; Admins can view all
+- **Materials**: Anyone can view; Only admins can modify
+- **Orders**: Role-based access (Customer → own, Worker → assigned, Admin → all)
+- **Job Cards/Drafts**: Workers → own; Admins → all
+- **Registration Codes**: Verification → public; Management → admin only
+
+---
+
+## 🧪 Testing Checklist
+
+After setup, verify:
+
+- [ ] Dark/light mode toggle works
+- [ ] Login/logout works
+- [ ] Signup with registration code works
+- [ ] Credit display shows 10 credits on signup
+- [ ] Credit consumption on order creation
+- [ ] Low credit warning at 5, 3, 1 credits
+- [ ] New API key generation
+- [ ] Email sending (check console in dev mode)
+- [ ] Dashboard shows correct role-based content
+- [ ] Protected routes redirect properly
+- [ ] Debug panel shows all information
+
+---
+
+## 🐛 Debug Mode
+
+The Debug Panel (🐛 button, bottom-left) shows:
+- Current theme
+- User authentication status
+- Credit balance and status
+- Quick credit consumption buttons
+- Test OTPs
+- Environment information
+
+Enable with:
 ```env
-# For development
-VITE_DEBUG=true  # Enable debug logging
-```
-
-### Never Commit
-
-- `.env` (contains secrets)
-- `.env.local`
-- Supabase keys
-
-These are already in `.gitignore`.
-
----
-
-## Testing
-
-### Test Signup Flow
-
-1. Go to http://localhost:5173/signup
-2. Select "Customer"
-3. Enter email and password
-4. Click "Sign Up"
-5. Check email for verification code
-6. Enter code on verification page
-7. Should redirect to login
-
-### Test Worker/Admin Signup
-
-1. Go to signup page
-2. Select "Worker" or "Admin"
-3. Enter registration code: `admin-master-2024` or `worker-master-2024`
-4. Complete signup
-5. Verify email
-6. Login
-
-### Test Password Reset
-
-1. Go to login page
-2. Click "Forgot password?"
-3. Enter email
-4. Check email for reset link
-5. Click link
-6. Enter new password
-7. Should redirect to login
-
-### Test with Different Emails
-
-- Gmail: Fast delivery
-- Outlook: Usually fast
-- Corporate email: May be slower
-- Temporary email: Often blocked
-
----
-
-## Deployment to Netlify
-
-### Step 1: Push to GitHub
-
-```bash
-git add .
-git commit -m "Initial commit"
-git push origin main
-```
-
-### Step 2: Connect to Netlify
-
-1. Go to https://netlify.com
-2. Click "Add new site"
-3. Select "Import an existing project"
-4. Choose GitHub
-5. Select your repository
-6. Click "Deploy"
-
-### Step 3: Configure Build Settings
-
-Netlify should auto-detect:
-- **Build command**: `pnpm build`
-- **Publish directory**: `dist`
-
-If not, set manually in **Site settings** → **Build & deploy** → **Build settings**
-
-### Step 4: Add Environment Variables
-
-1. Go to **Site settings** → **Build & deploy** → **Environment**
-2. Add enviroment variables.
-3. Click "Deploy site"
-
-### Step 5: Update Supabase CORS
-
-1. Go to Supabase Dashboard
-2. **Settings** → **API** → **CORS**
-3. Add your Netlify domain:
-   ```
-   https://your-site.netlify.app
-   ```
-
-### Step 6: Configure Custom Domain (Optional)
-
-1. In Netlify, go to **Domain settings**
-2. Click "Add custom domain"
-3. Follow instructions to update DNS
-4. Update Supabase CORS with custom domain
-
----
-
-## Troubleshooting
-
-### Issue: "Supabase environment variables not found"
-
-**Solution**:
-1. Check `.env` file exists
-2. Verify variable names are correct
-3. Restart dev server: `pnpm dev`
-4. Check browser console for errors
-
-### Issue: "Email verification not working"
-
-**Solution**:
-1. Check spam folder
-2. Verify Supabase email is configured
-3. Check Supabase logs for errors
-4. Try resending verification email
-5. See `EMAIL_TROUBLESHOOTING.md`
-
-### Issue: "Registration code rejected"
-
-**Solution**:
-1. Verify code is hashed correctly
-2. Check code exists in database:
-   ```sql
-   SELECT * FROM registration_codes WHERE role = 'admin';
-   ```
-3. Verify role matches (admin/worker)
-4. Check code hasn't been used
-
-### Issue: "Password doesn't meet requirements"
-
-**Solution**:
-Password must have:
-- ✅ 8+ characters
-- ✅ Uppercase letter (A-Z)
-- ✅ Lowercase letter (a-z)
-- ✅ Number (0-9)
-- ✅ Special character (!@#$%^&*)
-
-Example: `MyPassword123!`
-
-### Issue: "Netlify deployment fails"
-
-**Solution**:
-1. Check build logs in Netlify
-2. Verify dependencies install: `pnpm install`
-3. Check for TypeScript errors: `pnpm check`
-4. Verify environment variables are set
-5. Try rebuilding: **Deploys** → **Trigger deploy**
-
-### Issue: "CORS error in production"
-
-**Solution**:
-1. Go to Supabase **Settings** → **API**
-2. Add your Netlify domain to CORS whitelist
-3. Redeploy to Netlify
-
----
-
-## Performance Optimization
-
-### 1. Build Optimization
-
-```bash
-# Check bundle size
-pnpm build
-# Output is in dist/ folder
-```
-
-### 2. Image Optimization
-
-- Use WebP format when possible
-- Compress images before upload
-- Use lazy loading for images
-
-### 3. Code Splitting
-
-Already configured in Vite - no action needed.
-
-### 4. Caching
-
-Netlify automatically caches:
-- Static assets (images, CSS, JS)
-- HTML (with revalidation)
-
----
-
-## Monitoring & Maintenance
-
-### Check Supabase Health
-
-1. Go to https://status.supabase.com/
-2. Verify all systems are operational
-
-### Monitor Email Delivery
-
-1. Supabase Dashboard → **Logs** → **Auth**
-2. Filter by email address
-3. Check for errors
-
-### Review User Activity
-
-```sql
--- Recent signups
-SELECT id, email, created_at FROM auth.users 
-ORDER BY created_at DESC LIMIT 10;
-
--- Users by role
-SELECT role, COUNT(*) FROM users GROUP BY role;
+VITE_DEV_MODE=true
 ```
 
 ---
 
-## Security Checklist
+## 📞 Support
 
-- [ ] Changed default registration codes
-- [ ] Configured email templates
-- [ ] Set up CORS properly
-- [ ] Enabled HTTPS (automatic on Netlify)
-- [ ] Reviewed Supabase security settings
-- [ ] Set up password reset
-- [ ] Tested email verification
-- [ ] Tested role-based access
-- [ ] Reviewed authentication flow
-- [ ] Set up monitoring
+For issues:
+1. Check browser console for error logs
+2. Use Debug Panel to verify state
+3. Check Supabase SQL execution results
+4. Verify RLS policies in Supabase dashboard
 
 ---
 
-## Next Steps
+## 📝 Changelog
 
-1. **Customize branding**
-   - Update colors in `src/styles/`
-   - Update logo and favicon
-   - Customize email templates
-
-2. **Add features**
-   - Order management
-   - Payment processing
-   - Analytics dashboard
-
-3. **Set up CI/CD**
-   - Automated tests
-   - Automated deployments
-   - Code quality checks
-
-4. **Monitor production**
-   - Set up error tracking
-   - Monitor performance
-   - Track user metrics
+### Version 2.0.0
+- Added complete credit system
+- Implemented dark/light mode toggle
+- Added Shadcn UI components
+- Improved email sending
+- Enhanced debug logging
+- Added credit warning banners
+- Created API key management
+- Improved cost calculations in LKR
+- Added comprehensive RLS policies
 
 ---
 
-## Support & Resources
-
-- **Supabase Docs**: https://supabase.com/docs
-- **React Docs**: https://react.dev
-- **Vite Docs**: https://vitejs.dev
-- **Netlify Docs**: https://docs.netlify.com
-- **Email Troubleshooting**: See `EMAIL_TROUBLESHOOTING.md`
-
----
-
-**Last Updated**: December 2024
-**Version**: 1.0
+**Last Updated**: December 2025
+**Version**: 2.0.0

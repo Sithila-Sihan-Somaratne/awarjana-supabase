@@ -1,49 +1,64 @@
 // src/App.jsx
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import { ProtectedRoute } from './components/common/ProtectedRoute';
-import { useAuth } from './contexts/AuthContext';
-import GlobalThemeToggle from './components/GlobalThemeToggle';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Unauthorized from './pages/Unauthorized';
+// Main Application Component with Routing and Providers
+
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
+import { ProtectedRoute } from "./components/common/ProtectedRoute";
+import { ToastProvider } from "./components/ui/Toast";
+import { GlobalThemeToggle } from "./components/GlobalThemeToggle";
+
+// Pages
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import Unauthorized from "./pages/Unauthorized";
 
 // Dashboard Components
-import MainDashboard from './pages/dashboard/MainDashboard';
-import CustomerDashboard from './pages/dashboard/CustomerDashboard';
-import WorkerDashboard from './pages/dashboard/WorkerDashboard';
-import AdminDashboard from './pages/dashboard/AdminDashboard';
+import MainDashboard from "./pages/dashboard/MainDashboard";
+import CustomerDashboard from "./pages/dashboard/CustomerDashboard";
+import WorkerDashboard from "./pages/dashboard/WorkerDashboard";
+import AdminDashboard from "./pages/dashboard/AdminDashboard";
 
 // Order Management
-import NewOrder from './pages/orders/NewOrder';
-import OrderDetails from './pages/orders/OrderDetails';
-import OrderTracker from './pages/orders/OrderTracker';
+import NewOrder from "./pages/orders/NewOrder";
+import OrderDetails from "./pages/orders/OrderDetails";
+import OrderTracker from "./pages/orders/OrderTracker";
 
 // Worker Components
-import JobCards from './pages/worker/JobCards';
-import MaterialUsage from './pages/worker/MaterialUsage';
-import SubmitDraft from './pages/worker/SubmitDraft';
+import JobCards from "./pages/worker/JobCards";
+import MaterialUsage from "./pages/worker/MaterialUsage";
+import SubmitDraft from "./pages/worker/SubmitDraft";
 
 // Admin Components
-import InventoryManagement from './pages/admin/InventoryManagement';
-import RegistrationCodes from './pages/admin/RegistrationCodes';
-import AnalyticsReports from './pages/admin/AnalyticsReports';
-import UserManagement from './pages/admin/UserManagement';
+import InventoryManagement from "./pages/admin/InventoryManagement";
+import RegistrationCodes from "./pages/admin/RegistrationCodes";
+import AnalyticsReports from "./pages/admin/AnalyticsReports";
+import UserManagement from "./pages/admin/UserManagement";
 
-// Profile
-import Profile from './pages/Profile';
-import Settings from './pages/Settings';
+// Profile & Settings
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 
-// Main Layout
+// Main Layout Component
 function MainLayout() {
   const { user, userRole, logout } = useAuth();
   const location = useLocation();
-  
+
   // Don't show header on auth pages
-  const hideHeader = ['/login', '/signup', '/forgot-password', '/reset-password'].includes(location.pathname);
+  const hideHeader = [
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+  ].includes(location.pathname);
 
   if (hideHeader) {
     return <Outlet />;
@@ -60,16 +75,18 @@ function MainLayout() {
                 Awarjana Creations
               </h1>
               <span className="text-sm text-gray-600 dark:text-gray-400 hidden md:inline">
-                {userRole ? `(${userRole.charAt(0).toUpperCase() + userRole.slice(1)})` : ''}
+                {userRole
+                  ? `(${userRole.charAt(0).toUpperCase() + userRole.slice(1)})`
+                  : ""}
               </span>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               {/* User Info */}
               <div className="hidden md:block text-sm text-gray-600 dark:text-gray-400">
                 {user?.email}
               </div>
-              
+
               {/* Logout Button */}
               <button
                 onClick={logout}
@@ -81,7 +98,7 @@ function MainLayout() {
           </div>
         </div>
       </header>
-      
+
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
         <Outlet />
@@ -90,109 +107,170 @@ function MainLayout() {
   );
 }
 
+// App Routes Component
+function AppRoutes() {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Routes>
+      {/* Public Routes (No Header) */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/unauthorized" element={<Unauthorized />} />
+
+      {/* Protected Routes with Layout */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
+        {/* Main Dashboard Route */}
+        <Route path="/dashboard" element={<MainDashboard />} />
+
+        {/* Customer Routes */}
+        <Route
+          path="/dashboard/customer"
+          element={
+            <ProtectedRoute requiredRole="customer">
+              <CustomerDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders/new"
+          element={
+            <ProtectedRoute requiredRole="customer">
+              <NewOrder />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/orders/:id" element={<OrderDetails />} />
+        <Route
+          path="/orders/track"
+          element={
+            <ProtectedRoute requiredRole="customer">
+              <OrderTracker />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Worker Routes */}
+        <Route
+          path="/dashboard/worker"
+          element={
+            <ProtectedRoute requiredRole="worker">
+              <WorkerDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/worker/job-cards"
+          element={
+            <ProtectedRoute requiredRole="worker">
+              <JobCards />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/worker/material-usage"
+          element={
+            <ProtectedRoute requiredRole="worker">
+              <MaterialUsage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/worker/drafts/submit/:orderId"
+          element={
+            <ProtectedRoute requiredRole="worker">
+              <SubmitDraft />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Routes */}
+        <Route
+          path="/dashboard/admin"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/inventory"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <InventoryManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/codes"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <RegistrationCodes />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/analytics"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AnalyticsReports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <UserManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Common Routes */}
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
+      </Route>
+
+      {/* Redirects */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
+}
+
+// Main App Component
 function App() {
   return (
     <Router>
       <ThemeProvider>
         <AuthProvider>
-          <div className="relative min-h-screen">
-            <Routes>
-              {/* Public Routes (No Header) */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/unauthorized" element={<Unauthorized />} />
-              
-              {/* Protected Routes with Layout */}
-              <Route element={
-                <ProtectedRoute>
-                  <MainLayout />
-                </ProtectedRoute>
-              }>
-                {/* Main Dashboard Route */}
-                <Route path="/dashboard" element={<MainDashboard />} />
-                
-                {/* Customer Routes */}
-                <Route path="/dashboard/customer" element={
-                  <ProtectedRoute requiredRole="customer">
-                    <CustomerDashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/orders/new" element={
-                  <ProtectedRoute requiredRole="customer">
-                    <NewOrder />
-                  </ProtectedRoute>
-                } />
-                <Route path="/orders/:id" element={<OrderDetails />} />
-                <Route path="/orders/track" element={
-                  <ProtectedRoute requiredRole="customer">
-                    <OrderTracker />
-                  </ProtectedRoute>
-                } />
-                
-                {/* Worker Routes */}
-                <Route path="/dashboard/worker" element={
-                  <ProtectedRoute requiredRole="worker">
-                    <WorkerDashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/worker/job-cards" element={
-                  <ProtectedRoute requiredRole="worker">
-                    <JobCards />
-                  </ProtectedRoute>
-                } />
-                <Route path="/worker/material-usage" element={
-                  <ProtectedRoute requiredRole="worker">
-                    <MaterialUsage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/worker/drafts/submit/:orderId" element={
-                  <ProtectedRoute requiredRole="worker">
-                    <SubmitDraft />
-                  </ProtectedRoute>
-                } />
-                
-                {/* Admin Routes */}
-                <Route path="/dashboard/admin" element={
-                  <ProtectedRoute requiredRole="admin">
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin/inventory" element={
-                  <ProtectedRoute requiredRole="admin">
-                    <InventoryManagement />
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin/codes" element={
-                  <ProtectedRoute requiredRole="admin">
-                    <RegistrationCodes />
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin/analytics" element={
-                  <ProtectedRoute requiredRole="admin">
-                    <AnalyticsReports />
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin/users" element={
-                  <ProtectedRoute requiredRole="admin">
-                    <UserManagement />
-                  </ProtectedRoute>
-                } />
-                
-                {/* Common Routes */}
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/settings" element={<Settings />} />
-              </Route>
-              
-              {/* Redirects */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-            
-            {/* Global Floating Theme Toggle */}
-            <GlobalThemeToggle />
-          </div>
+          <ToastProvider>
+            <div className="relative min-h-screen">
+              <AppRoutes />
+
+              {/* Global Floating Theme Toggle */}
+              <GlobalThemeToggle />
+            </div>
+          </ToastProvider>
         </AuthProvider>
       </ThemeProvider>
     </Router>
