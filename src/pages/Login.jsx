@@ -1,4 +1,3 @@
-// src/pages/Login.jsx
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -36,6 +35,16 @@ export default function Login() {
     const result = await login(email, password);
 
     if (result.success) {
+      // Check if email is verified
+      if (result.user && !result.user.email_confirmed_at) {
+        setAlertMessage({
+          type: "error",
+          message: "Please verify your email before logging in. Check your inbox for the verification link.",
+        });
+        setLoading(false);
+        return;
+      }
+
       setAlertMessage({
         type: "success",
         message: "Login successful! Redirecting...",
