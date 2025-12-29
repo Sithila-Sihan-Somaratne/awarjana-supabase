@@ -33,10 +33,10 @@ function OrderCard({ order, onView, onAction }) {
     <div className="card p-4 hover:shadow-lg transition-all hover:border-primary/50">
       <div className="flex justify-between items-start mb-3">
         <div>
-          <h3 className="text-lg font-semibold text-white">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Order #{order.order_number || order.id}
           </h3>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             {order.description || 'No description'}
           </p>
         </div>
@@ -48,12 +48,12 @@ function OrderCard({ order, onView, onAction }) {
 
       <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
         <div>
-          <p className="text-gray-500">Cost</p>
-          <p className="text-white font-semibold">${order.cost || order.total_amount || 0}</p>
+          <p className="text-gray-500 dark:text-gray-400">Cost</p>
+          <p className="text-gray-900 dark:text-white font-semibold">${order.cost || order.total_amount || 0}</p>
         </div>
         <div>
-          <p className="text-gray-500">Created</p>
-          <p className="text-white">
+          <p className="text-gray-500 dark:text-gray-400">Created</p>
+          <p className="text-gray-900 dark:text-white">
             {new Date(order.created_at).toLocaleDateString()}
           </p>
         </div>
@@ -61,8 +61,8 @@ function OrderCard({ order, onView, onAction }) {
 
       {order.deadline && (
         <div className="mb-4 text-sm">
-          <p className="text-gray-500">Deadline</p>
-          <p className={`text-white ${new Date(order.deadline) < new Date() ? 'text-red-500' : ''}`}>
+          <p className="text-gray-500 dark:text-gray-400">Deadline</p>
+          <p className={`text-gray-900 dark:text-white ${new Date(order.deadline) < new Date() ? 'text-red-500' : ''}`}>
             {new Date(order.deadline).toLocaleDateString()}
           </p>
         </div>

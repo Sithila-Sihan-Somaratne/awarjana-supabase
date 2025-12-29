@@ -22,10 +22,10 @@ function JobCard({ order, onStartWork, onSubmitDraft, onViewDetails }) {
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
-          <h3 className="text-lg font-bold text-white mb-1">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
             Order #{order.order_number || order.id}
           </h3>
-          <p className="text-sm text-gray-400 line-clamp-2">
+          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
             {order.description || 'No description provided'}
           </p>
         </div>
@@ -50,16 +50,16 @@ function JobCard({ order, onStartWork, onSubmitDraft, onViewDetails }) {
         <div className="flex items-start gap-2">
           <Package size={16} className="text-gray-500 mt-0.5" />
           <div>
-            <p className="text-gray-500">Dimensions</p>
-            <p className="text-white font-medium">{order.dimensions || 'N/A'}</p>
+            <p className="text-gray-500 dark:text-gray-400">Dimensions</p>
+            <p className="text-gray-900 dark:text-white font-medium">{order.dimensions || 'N/A'}</p>
           </div>
         </div>
         <div className="flex items-start gap-2">
           <Calendar size={16} className="text-gray-500 mt-0.5" />
           <div>
-            <p className="text-gray-500">Deadline</p>
+            <p className="text-gray-500 dark:text-gray-400">Deadline</p>
             <p className={`font-medium ${
-              isOverdue ? 'text-red-500' : isUrgent ? 'text-yellow-500' : 'text-white'
+              isOverdue ? 'text-red-500' : isUrgent ? 'text-yellow-500' : (order.status === 'completed' ? 'text-green-500' : 'text-gray-900 dark:text-white')
             }`}>
               {order.deadline ? new Date(order.deadline).toLocaleDateString() : 'Not set'}
             </p>
@@ -68,19 +68,19 @@ function JobCard({ order, onStartWork, onSubmitDraft, onViewDetails }) {
       </div>
 
       {/* Additional Info */}
-      <div className="mb-4 pb-4 border-b border-gray-700">
+      <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
         <div className="text-sm space-y-1">
-          <p className="text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400">
             <span className="text-gray-500">Customer:</span>{' '}
-            <span className="text-white">{order.customer?.name || order.customer_id}</span>
+            <span className="text-gray-900 dark:text-white">{order.customer?.name || order.customer_id}</span>
           </p>
-          <p className="text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400">
             <span className="text-gray-500">Material:</span>{' '}
-            <span className="text-white">{order.material || 'Not specified'}</span>
+            <span className="text-gray-900 dark:text-white">{order.material || 'Not specified'}</span>
           </p>
-          <p className="text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400">
             <span className="text-gray-500">Amount:</span>{' '}
-            <span className="text-white font-semibold">${order.total_amount || order.cost || 0}</span>
+            <span className="text-gray-900 dark:text-white font-semibold">${order.total_amount || order.cost || 0}</span>
           </p>
         </div>
       </div>

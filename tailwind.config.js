@@ -16,57 +16,57 @@ export default {
     },
     extend: {
       colors: {
-        // Primary brand colors (Yellow & Black theme)
+        // High-Contrast Brand Colors
         primary: {
-          50: '#fefce8',
-          100: '#fef9c3',
-          200: '#fef08a',
-          300: '#fde047',
-          400: '#facc15',
-          500: '#eab308', // Main yellow
-          600: '#ca8a04',
-          700: '#a16207',
-          800: '#854d0e',
-          900: '#713f12',
-          DEFAULT: '#eab308',
+          50: '#fffbeb',
+          100: '#fef3c7',
+          200: '#fde68a',
+          300: '#fcd34d',
+          400: '#fbbf24',
+          500: '#f59e0b', // High-visibility Yellow
+          600: '#d97706',
+          700: '#b45309',
+          800: '#92400e',
+          900: '#78350f',
+          DEFAULT: '#f59e0b',
           foreground: '#000000',
         },
-        // Dark theme palette
+        // Pure Black & White Theme
         dark: {
-          DEFAULT: '#121212',
-          lighter: '#1e1e1e',
-          light: '#2d2d2d',
-          border: '#404040',
+          DEFAULT: '#000000', // Pure Black
+          lighter: '#0a0a0a',
+          light: '#171717',
+          border: '#262626',
         },
-        // shadcn/ui compatible colors
+        // shadcn/ui compatible high-contrast variables
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "#ffffff",
+          foreground: "#000000",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "#ef4444",
+          foreground: "#ffffff",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "#171717",
+          foreground: "#a3a3a3",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "#f59e0b",
+          foreground: "#000000",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "#000000",
+          foreground: "#ffffff",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "#000000",
+          foreground: "#ffffff",
         },
       },
       borderRadius: {

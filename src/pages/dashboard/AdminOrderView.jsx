@@ -49,10 +49,10 @@ const AdminOrderView = ({ orders, onRefresh, onAssign }) => {
   return (
     <div>
       {/* Bulk Actions Toolbar */}
-      <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+      <div className="mb-4 p-4 bg-gray-50 dark:bg-dark-light rounded-lg border dark:border-dark-border">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
               {selectedOrders.length} order(s) selected
             </span>
             {selectedOrders.length > 0 && (
@@ -101,10 +101,11 @@ const AdminOrderView = ({ orders, onRefresh, onAssign }) => {
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b">
+            <tr className="border-b dark:border-dark-border">
               <th className="text-left p-3">
                 <input 
                   type="checkbox"
+                  className="rounded border-gray-300 dark:border-gray-600 dark:bg-dark"
                   checked={selectedOrders.length === orders.length}
                   onChange={() => {
                     if (selectedOrders.length === orders.length) {
@@ -115,34 +116,35 @@ const AdminOrderView = ({ orders, onRefresh, onAssign }) => {
                   }}
                 />
               </th>
-              <th className="text-left p-3">Order #</th>
-              <th className="text-left p-3">Customer</th>
-              <th className="text-left p-3">Amount</th>
-              <th className="text-left p-3">Status</th>
-              <th className="text-left p-3">Worker</th>
-              <th className="text-left p-3">Deadline</th>
-              <th className="text-left p-3">Actions</th>
+              <th className="text-left p-3 text-gray-700 dark:text-gray-300">Order #</th>
+              <th className="text-left p-3 text-gray-700 dark:text-gray-300">Customer</th>
+              <th className="text-left p-3 text-gray-700 dark:text-gray-300">Amount</th>
+              <th className="text-left p-3 text-gray-700 dark:text-gray-300">Status</th>
+              <th className="text-left p-3 text-gray-700 dark:text-gray-300">Worker</th>
+              <th className="text-left p-3 text-gray-700 dark:text-gray-300">Deadline</th>
+              <th className="text-left p-3 text-gray-700 dark:text-gray-300">Actions</th>
             </tr>
           </thead>
           <tbody>
             {orders.map(order => (
-              <tr key={order.id} className="border-b hover:bg-gray-50">
+              <tr key={order.id} className="border-b dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-light">
                 <td className="p-3">
                   <input 
                     type="checkbox"
+                    className="rounded border-gray-300 dark:border-gray-600 dark:bg-dark"
                     checked={selectedOrders.includes(order.id)}
                     onChange={() => handleSelectOrder(order.id)}
                   />
                 </td>
-                <td className="p-3 font-medium">{order.order_number}</td>
-                <td className="p-3">{order.customer?.email || 'N/A'}</td>
-                <td className="p-3 font-bold">${order.total_amount}</td>
+                <td className="p-3 font-medium text-gray-900 dark:text-white">{order.order_number}</td>
+                <td className="p-3 text-gray-700 dark:text-gray-300">{order.customer?.email || 'N/A'}</td>
+                <td className="p-3 font-bold text-gray-900 dark:text-white">${order.total_amount}</td>
                 <td className="p-3">
                   <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadge(order.status)}`}>
                     {order.status.replace('_', ' ')}
                   </span>
                 </td>
-                <td className="p-3">
+                <td className="p-3 text-gray-700 dark:text-gray-300">
                   {order.worker ? (
                     <span className="flex items-center">
                       <Users size={14} className="mr-1" />
@@ -160,7 +162,7 @@ const AdminOrderView = ({ orders, onRefresh, onAssign }) => {
                     </button>
                   )}
                 </td>
-                <td className="p-3">
+                <td className="p-3 text-gray-700 dark:text-gray-300">
                   {order.deadline ? (
                     new Date(order.deadline).toLocaleDateString()
                   ) : (
@@ -196,18 +198,18 @@ const AdminOrderView = ({ orders, onRefresh, onAssign }) => {
       {/* Assign Worker Modal */}
       {assignWorkerModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-xl font-semibold mb-4">Assign to Worker</h3>
-            <p className="text-gray-600 mb-4">
+          <div className="bg-white dark:bg-dark-lighter rounded-lg p-6 max-w-md w-full border dark:border-dark-border">
+            <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Assign to Worker</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               Assign {selectedOrders.length} order(s) to:
             </p>
             
             <div className="space-y-3 mb-6">
               {workers.map(worker => (
-                <div key={worker.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div key={worker.id} className="flex items-center justify-between p-3 border dark:border-dark-border rounded-lg">
                   <div>
-                    <p className="font-medium">{worker.name}</p>
-                    <p className="text-sm text-gray-500">
+                    <p className="font-medium text-gray-900 dark:text-white">{worker.name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                       Current load: {worker.current_load} orders
                     </p>
                   </div>

@@ -78,7 +78,7 @@ export default function InventoryManagement() {
     // Category filter
     if (filterCategory !== 'all') {
       if (filterCategory === 'low_stock') {
-        filtered = filtered.filter(m => m.stock_quantity <= m.low_stock_threshold)
+        filtered = filtered.filter(m => (m.stock_quantity || 0) <= (m.low_stock_threshold || 0))
       } else {
         filtered = filtered.filter(m => m.category === filterCategory)
       }
@@ -194,7 +194,7 @@ export default function InventoryManagement() {
   }
 
   const categories = [...new Set(materials.map(m => m.category).filter(Boolean))]
-  const lowStockCount = materials.filter(m => m.stock_quantity <= m.low_stock_threshold).length
+  const lowStockCount = materials.filter(m => (m.stock_quantity || 0) <= (m.low_stock_threshold || 0)).length
 
   if (loading) return <LoadingSpinner />
 

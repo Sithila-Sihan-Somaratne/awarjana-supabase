@@ -2,8 +2,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Alert } from '../components/common/Alert'
-import { Mail, Lock, Loader, Key, ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import Alert from '../components/common/Alert'
+import { Mail, Lock, Loader, Key, ArrowLeft, Eye, EyeOff, Check, X } from 'lucide-react'
 import { validatePassword } from '../lib/crypto'
 
 export default function Signup() {
@@ -31,23 +31,6 @@ export default function Signup() {
   const handlePasswordChange = (value) => {
     setPassword(value)
     setPasswordStrength(validatePassword(value))
-  }
-
-  const getPasswordStrengthScore = (password) => {
-    let score = 0
-    if (password.length >= 8) score++
-    if (/[A-Z]/.test(password)) score++
-    if (/[a-z]/.test(password)) score++
-    if (/[0-9]/.test(password)) score++
-    if (/[!@#$%^&*]/.test(password)) score++
-    return score
-  }
-
-  const getPasswordStrengthColor = (score) => {
-    if (score === 0) return 'bg-gray-700'
-    if (score <= 2) return 'bg-red-500'
-    if (score <= 3) return 'bg-yellow-500'
-    return 'bg-green-500'
   }
 
   const handleSignupSubmit = async (e) => {
@@ -103,8 +86,8 @@ export default function Signup() {
   }
 
   const handleVerifyOTP = async () => {
-    if (!otp || otp.length < 6) {
-      setAlertMessage({ type: 'error', message: 'Please enter a valid verification code (at least 6 digits)' })
+    if (!otp || otp.length < 8) {
+      setAlertMessage({ type: 'error', message: 'Please enter a valid verification code (at least 8 digits)' })
       return
     }
 
@@ -164,14 +147,22 @@ export default function Signup() {
     setAlertMessage(null)
   }
 
+  const requirements = [
+    { label: 'At least 8 characters', test: (p) => p.length >= 8 },
+    { label: 'One uppercase letter (A-Z)', test: (p) => /[A-Z]/.test(p) },
+    { label: 'One lowercase letter (a-z)', test: (p) => /[a-z]/.test(p) },
+    { label: 'One number (0-9)', test: (p) => /[0-9]/.test(p) },
+    { label: 'One special character (!@#$%^&*)', test: (p) => /[!@#$%^&*]/.test(p) },
+  ]
+
   return (
-    <div className="min-h-screen bg-dark flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark flex items-center justify-center px-4 py-8 transition-colors duration-200">
       <div className="w-full max-w-md">
-        <div className="card p-8">
-          <h1 className="text-3xl font-bold text-primary mb-2">
+        <div className="bg-white dark:bg-dark-lighter shadow-md rounded-lg p-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             {step === 'signup' ? 'Create Account' : 'Verify Email'}
           </h1>
-          <p className="text-gray-400 mb-8">
+          <p className="text-gray-600 dark:text-gray-400 mb-8">
             {step === 'signup' ? 'Join Awarjana Creations' : 'Enter verification code'}
           </p>
 
@@ -186,31 +177,33 @@ export default function Signup() {
           {step === 'signup' ? (
             <form onSubmit={handleSignupSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 text-gray-500" size={18} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="text-gray-400 dark:text-gray-500" size={18} />
+                  </div>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
                     required
-                    className="w-full pl-10 pr-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
                     autoComplete="email"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Account Type
                 </label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="w-full px-4 py-2 bg-white dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
                 >
                   <option value="customer">Customer</option>
                   <option value="worker">Worker</option>
@@ -220,7 +213,7 @@ export default function Signup() {
 
               {(role === 'worker' || role === 'admin') && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Registration Code
                   </label>
                   <input
@@ -229,7 +222,7 @@ export default function Signup() {
                     onChange={(e) => setRegistrationCode(e.target.value)}
                     placeholder="Enter registration code"
                     required
-                    className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="w-full px-4 py-2 bg-white dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Ask your admin for the registration code
@@ -238,209 +231,149 @@ export default function Signup() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 text-gray-500" size={18} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="text-gray-400 dark:text-gray-500" size={18} />
+                  </div>
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => handlePasswordChange(e.target.value)}
                     placeholder="Enter a strong password"
                     required
-                    className="w-full pl-10 pr-10 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="w-full pl-10 pr-10 py-2 bg-white dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
                     autoComplete="new-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-gray-500 hover:text-gray-300"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
                 
                 {password && (
-                  <div className="mt-3 space-y-1">
-                    {/* Password strength meter */}
-                    <div className="mb-2">
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map(i => (
-                          <div 
-                            key={i}
-                            className={`h-1 flex-1 rounded ${
-                              getPasswordStrengthScore(password) >= i 
-                                ? getPasswordStrengthColor(getPasswordStrengthScore(password))
-                                : 'bg-gray-700'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Password requirements */}
-                    <div className="text-xs font-medium text-gray-400 mb-1">Password must have:</div>
-                    <div className={`text-xs ${password.length >= 8 ? 'text-success' : 'text-gray-500'}`}>
-                      ✓ At least 8 characters
-                    </div>
-                    <div className={`text-xs ${/[A-Z]/.test(password) ? 'text-success' : 'text-gray-500'}`}>
-                      ✓ One uppercase letter (A-Z)
-                    </div>
-                    <div className={`text-xs ${/[a-z]/.test(password) ? 'text-success' : 'text-gray-500'}`}>
-                      ✓ One lowercase letter (a-z)
-                    </div>
-                    <div className={`text-xs ${/[0-9]/.test(password) ? 'text-success' : 'text-gray-500'}`}>
-                      ✓ One number (0-9)
-                    </div>
-                    <div className={`text-xs ${/[!@#$%^&*]/.test(password) ? 'text-success' : 'text-gray-500'}`}>
-                      ✓ One special character (!@#$%^&*)
+                  <div className="mt-3 space-y-2">
+                    <div className="grid grid-cols-1 gap-1">
+                      {requirements.map((req, i) => {
+                        const isMet = req.test(password)
+                        return (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            {isMet ? (
+                              <Check size={12} className="text-green-500" />
+                            ) : (
+                              <X size={12} className="text-red-500" />
+                            )}
+                            <span className={isMet ? 'text-green-500' : 'text-gray-500 dark:text-gray-400'}>
+                              {req.label}
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 text-gray-500" size={18} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="text-gray-400 dark:text-gray-500" size={18} />
+                  </div>
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm your password"
                     required
-                    className="w-full pl-10 pr-10 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="w-full pl-10 pr-10 py-2 bg-white dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
                     autoComplete="new-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-3 text-gray-500 hover:text-gray-300"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
                 {confirmPassword && password !== confirmPassword && (
-                  <p className="text-xs text-error mt-1">Passwords do not match</p>
+                  <div className="flex items-center gap-1.5 mt-1.5 text-red-500">
+                    <X size={14} />
+                    <p className="text-xs font-medium tracking-wide">Passwords do not match</p>
+                  </div>
                 )}
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full btn-primary flex items-center justify-center gap-2 mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full btn-primary flex items-center justify-center gap-2 mt-6"
               >
-                {loading ? (
-                  <>
-                    <Loader size={18} className="animate-spin" />
-                    Creating Account...
-                  </>
-                ) : (
-                  'Continue to Verification'
-                )}
+                {loading ? <Loader size={18} className="animate-spin" /> : 'Create Account'}
               </button>
             </form>
           ) : (
             <div className="space-y-6">
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                  <Key className="text-primary" size={32} />
-                </div>
-                <h2 className="text-xl font-semibold text-white mb-2">
-                  Check Your Email
-                </h2>
-                <p className="text-gray-400">
-                  Enter the verification code sent to <span className="font-medium text-white">
-                    {signupData?.email || pendingVerification?.email || email}
-                  </span>
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  Check your email for the verification code from Supabase
-                </p>
-              </div>
-
+              <button
+                onClick={handleBackToSignup}
+                className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                <ArrowLeft size={16} /> Back to signup
+              </button>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3 text-center">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Verification Code
                 </label>
                 <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Key className="text-gray-400 dark:text-gray-500" size={18} />
+                  </div>
                   <input
                     type="text"
                     value={otp}
                     onChange={(e) => handleOtpChange(e.target.value)}
-                    placeholder="Enter verification code"
-                    className="w-full px-4 py-3 text-center text-2xl tracking-widest font-mono bg-dark border-2 border-gray-700 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    autoFocus
+                    placeholder="Enter 8-digit code"
+                    maxLength={8}
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 text-center text-2xl tracking-widest font-bold"
                   />
                 </div>
-                <div className="flex justify-between mt-2">
-                  <p className="text-xs text-gray-500">
-                    Enter digits only (0-9)
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {otp.length} digits
-                  </p>
-                </div>
               </div>
 
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleBackToSignup}
-                  className="flex-1 btn-secondary flex items-center justify-center gap-2"
-                >
-                  <ArrowLeft size={16} />
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={handleVerifyOTP}
-                  disabled={verifying || otp.length < 6}
-                  className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {verifying ? (
-                    <>
-                      <Loader size={18} className="animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    'Verify Account'
-                  )}
-                </button>
-              </div>
+              <button
+                onClick={handleVerifyOTP}
+                disabled={verifying || otp.length < 8}
+                className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {verifying ? <Loader size={18} className="animate-spin" /> : 'Verify Account'}
+              </button>
 
-              <div className="text-center pt-4 border-t border-gray-800">
-                <p className="text-sm text-gray-400 mb-2">
-                  Didn't receive the code?
-                </p>
+              <div className="text-center">
                 <button
-                  type="button"
                   onClick={handleResendOTP}
                   disabled={resending}
-                  className="text-sm text-primary hover:underline font-medium disabled:opacity-50"
+                  className="text-sm text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50"
                 >
-                  {resending ? 'Resending...' : 'Resend verification code'}
+                  {resending ? 'Sending...' : "Didn't receive a code? Resend"}
                 </button>
-                <p className="text-xs text-gray-500 mt-2">
-                  It may take a minute to arrive. Check your spam folder.
-                </p>
               </div>
             </div>
           )}
 
-          {step === 'signup' && (
-            <div className="mt-6 text-center text-sm text-gray-400">
-              Already have an account?{' '}
-              <Link to="/login" className="text-primary hover:underline font-medium">
-                Sign in here
-              </Link>
-            </div>
-          )}
+          <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+            Already have an account?{" "}
+            <Link to="/login" className="text-primary-600 dark:text-primary-400 hover:underline font-medium">
+              Sign in here
+            </Link>
+          </div>
         </div>
       </div>
     </div>

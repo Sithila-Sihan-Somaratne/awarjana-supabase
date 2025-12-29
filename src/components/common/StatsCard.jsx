@@ -12,7 +12,7 @@ function StatsCard({ title, value, icon: Icon, color = 'primary', trend, subtitl
     <div className="card p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <p className="text-gray-400 text-sm mb-2">{title}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">{title}</p>
           <p className={`text-3xl font-bold ${colorClasses[color]}`}>
             {value}
           </p>

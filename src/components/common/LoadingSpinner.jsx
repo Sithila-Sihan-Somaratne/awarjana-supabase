@@ -14,7 +14,7 @@ function LoadingSpinner({ size = 'md', text = 'Loading...' }) {
         className={`${sizeClasses[size]} text-primary animate-spin`} 
       />
       {text && (
-        <p className="mt-4 text-gray-400 text-sm">{text}</p>
+        <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">{text}</p>
       )}
     </div>
   )

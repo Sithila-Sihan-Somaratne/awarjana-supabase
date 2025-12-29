@@ -78,15 +78,19 @@ export function AuthProvider({ children }) {
           const verification = await verifyUserExistsInDatabase(session.user.id);
           
           if (!verification.exists) {
-            console.warn("⚠️ Session exists but user not found in database!");
+            console.warn("⚠️ Session exists but user not found in database! (Ghost Session Detected)");
             
             // Force logout since user doesn't exist
             await supabase.auth.signOut();
             setUser(null);
             setUserRole(null);
             
-            // Clear local storage to ensure JWT is reset
+            // Clear EVERYTHING to prevent infinite loops
             localStorage.clear();
+            sessionStorage.clear();
+            
+            // Redirect to login if possible
+            window.location.href = '/login';
             
             setError("User account not found. Please sign in again.");
           } else {

@@ -188,10 +188,10 @@ export default function OrderDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-dark flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading order details...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading order details...</p>
         </div>
       </div>
     )
@@ -199,7 +199,7 @@ export default function OrderDetails() {
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-gray-50 dark:bg-dark py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Alert
             type="error"
@@ -209,7 +209,7 @@ export default function OrderDetails() {
           <div className="mt-4">
             <button
               onClick={() => navigate('/dashboard')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
@@ -243,21 +243,21 @@ export default function OrderDetails() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark transition-colors duration-200">
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-white dark:bg-dark-lighter shadow dark:shadow-none border-b dark:border-dark-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-start">
             <div>
               <button
                 onClick={() => navigate(-1)}
-                className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 mb-2"
+                className="inline-flex items-center text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mb-2"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </button>
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-gray-900 mr-4">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mr-4">
                   Order #{order.order_number}
                 </h1>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
@@ -265,7 +265,7 @@ export default function OrderDetails() {
                   <span className="ml-2 capitalize">{order.status.replace('_', ' ')}</span>
                 </span>
               </div>
-              <p className="mt-1 text-gray-600">{order.title}</p>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">{order.title}</p>
             </div>
             <div className="flex space-x-3">
               <button

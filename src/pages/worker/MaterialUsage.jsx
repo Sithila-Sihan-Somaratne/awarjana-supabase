@@ -151,7 +151,7 @@ export default function MaterialUsage() {
       const { error: stockError } = await supabase
         .from('materials')
         .update({
-          current_stock: supabase.raw(`current_stock - ${parseFloat(formData.quantity_used)}`)
+          stock_quantity: supabase.raw(`stock_quantity - ${parseFloat(formData.quantity_used)}`)
         })
         .eq('id', material.material_id)
 
@@ -370,7 +370,7 @@ export default function MaterialUsage() {
                         <div>
                           <span className="text-blue-700">Current Stock:</span>
                           <span className="ml-2 text-blue-900">
-                            {getSelectedMaterial().material?.current_stock} {getSelectedMaterial().material?.unit}
+                            {getSelectedMaterial().material?.stock_quantity} {getSelectedMaterial().material?.unit}
                           </span>
                         </div>
                       </div>

@@ -25,7 +25,7 @@ function InventoryAlerts({ alerts = [], onReorder }) {
   return (
     <div className="card p-4">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
           <AlertTriangle size={20} className="text-yellow-500" />
           Inventory Alerts
         </h3>
@@ -58,7 +58,7 @@ function InventoryAlerts({ alerts = [], onReorder }) {
                     <AlertIcon size={20} className={config.color.split(' ')[1]} />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-white">
+                        <h4 className="font-semibold text-gray-900 dark:text-white">
                           {alert.material_name || alert.item_name}
                         </h4>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${config.color}`}>
@@ -66,15 +66,15 @@ function InventoryAlerts({ alerts = [], onReorder }) {
                         </span>
                       </div>
                       
-                      <div className="text-sm text-gray-300 space-y-1">
+                      <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
                         <p>
-                          <span className="text-gray-500">Current Stock:</span>{' '}
+                          <span className="text-gray-500 dark:text-gray-400">Current Stock:</span>{' '}
                           <span className="font-semibold">
                             {alert.current_quantity} {alert.unit || 'units'}
                           </span>
                         </p>
                         <p>
-                          <span className="text-gray-500">Minimum Required:</span>{' '}
+                          <span className="text-gray-500 dark:text-gray-400">Minimum Required:</span>{' '}
                           <span className="font-semibold">
                             {alert.minimum_quantity} {alert.unit || 'units'}
                           </span>

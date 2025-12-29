@@ -14,16 +14,16 @@ function TaskProgress({ current, total, label, showPercentage = true, color = 'p
     <div className="w-full">
       {label && (
         <div className="flex justify-between items-center mb-2">
-          <span className="text-sm text-gray-400">{label}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
           {showPercentage && (
-            <span className="text-sm font-semibold text-white">
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">
               {percentage}%
             </span>
           )}
         </div>
       )}
       
-      <div className="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
+      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
         <div
           className={`h-full ${colorClasses[color]} transition-all duration-500 ease-out rounded-full`}
           style={{ width: `${percentage}%` }}

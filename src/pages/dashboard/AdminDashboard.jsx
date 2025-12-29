@@ -79,7 +79,7 @@ export default function AdminDashboard() {
       const { data: materialsData, error: materialsError } = await supabase
         .from("materials")
         .select("*")
-        .order("current_stock", { ascending: true });
+        .order("stock_quantity", { ascending: true });
 
       if (materialsError) throw materialsError;
 
@@ -93,7 +93,7 @@ export default function AdminDashboard() {
       const totalRevenue = ordersData?.filter(o => o.status === "completed")
         .reduce((sum, order) => sum + (parseFloat(order.total_amount) || 0), 0) || 0;
       const totalUsers = usersData?.length || 0;
-      const lowStockItems = materialsData?.filter((m) => (m.current_stock || 0) < (m.minimum_stock || 0)).length || 0;
+      const lowStockItems = materialsData?.filter((m) => (m.stock_quantity || 0) < (m.low_stock_threshold || 0)).length || 0;
       
       // Get active workers
       const activeWorkers = usersData?.filter(u => u.role === 'worker').length || 0;
@@ -174,9 +174,9 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-dark flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">Loading admin dashboard...</p>
         </div>
       </div>
@@ -184,9 +184,9 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark transition-colors duration-200">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow">
+      <div className="bg-white dark:bg-dark-lighter shadow dark:shadow-none border-b dark:border-dark-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>

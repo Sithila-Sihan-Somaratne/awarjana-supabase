@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Alert } from '../components/common/Alert'
-import { ArrowLeft, Plus, Trash2, Calculator } from 'lucide-react'
+import Alert from '../components/common/Alert'
+import { ArrowLeft, Plus, Trash2, Loader } from 'lucide-react'
+import { calculateOrderCost, formatLKR } from '../lib/costCalculator'
 
 export default function NewOrder() {
   const navigate = useNavigate()
   const { user, userRole } = useAuth()
   
   const [loading, setLoading] = useState(false)
+  const [fetchingMaterials, setFetchingMaterials] = useState(true)
   const [alertMessage, setAlertMessage] = useState(null)
   const [materials, setMaterials] = useState([])
   const [selectedMaterials, setSelectedMaterials] = useState([])
@@ -24,6 +26,8 @@ export default function NewOrder() {
     customerNotes: ''
   })
 
+  const [calculatedCost, setCalculatedCost] = useState(null)
+
   useEffect(() => {
     if (!user || userRole !== 'customer') {
       navigate('/dashboard')
@@ -32,17 +36,30 @@ export default function NewOrder() {
     fetchMaterials()
   }, [user, userRole, navigate])
 
+  useEffect(() => {
+    if (formData.height && formData.width) {
+      const cost = calculateOrderCost(parseFloat(formData.width), parseFloat(formData.height))
+      setCalculatedCost(cost)
+    } else {
+      setCalculatedCost(null)
+    }
+  }, [formData.height, formData.width])
+
   const fetchMaterials = async () => {
+    setFetchingMaterials(true)
     try {
       const { data, error } = await supabase
         .from('materials')
         .select('*')
-        .order('category', { ascending: true })
+        .order('name', { ascending: true })
 
       if (error) throw error
       setMaterials(data || [])
     } catch (err) {
-      setAlertMessage({ type: 'error', message: 'Failed to load materials: ' + err.message })
+      console.error('Error fetching materials:', err)
+      setAlertMessage({ type: 'error', message: 'Failed to load materials. Please check your connection.' })
+    } finally {
+      setFetchingMaterials(false)
     }
   }
 
@@ -74,9 +91,11 @@ export default function NewOrder() {
   }
 
   const calculateTotalCost = () => {
-    return selectedMaterials.reduce((total, item) => {
+    const baseCost = calculatedCost ? calculatedCost.total : 0
+    const materialsCost = selectedMaterials.reduce((total, item) => {
       return total + (item.cost * item.quantity)
     }, 0)
+    return baseCost + materialsCost
   }
 
   const generateOrderNumber = () => {
@@ -91,38 +110,31 @@ export default function NewOrder() {
     setAlertMessage(null)
 
     try {
-      // Validation
       if (!formData.height || !formData.width) {
         throw new Error('Please enter frame dimensions')
-      }
-
-      if (selectedMaterials.length === 0) {
-        throw new Error('Please select at least one material')
       }
 
       const totalCost = calculateTotalCost()
       const orderNumber = generateOrderNumber()
 
-      // Calculate deadline based on type
       let confirmedDeadline = new Date()
       if (formData.deadlineType === 'standard') {
-        confirmedDeadline.setDate(confirmedDeadline.getDate() + 7) // 7 days
+        confirmedDeadline.setDate(confirmedDeadline.getDate() + 7)
       } else if (formData.deadlineType === 'express') {
-        confirmedDeadline.setDate(confirmedDeadline.getDate() + 3) // 3 days
+        confirmedDeadline.setDate(confirmedDeadline.getDate() + 3)
       } else if (formData.requestedDeadline) {
         confirmedDeadline = new Date(formData.requestedDeadline)
       }
 
-      // Create order
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
           customer_id: user.id,
           order_number: orderNumber,
-          height: parseInt(formData.height),
-          width: parseInt(formData.width),
-          height2: formData.height2 ? parseInt(formData.height2) : null,
-          width2: formData.width2 ? parseInt(formData.width2) : null,
+          height: parseFloat(formData.height),
+          width: parseFloat(formData.width),
+          height2: formData.height2 ? parseFloat(formData.height2) : null,
+          width2: formData.width2 ? parseFloat(formData.width2) : null,
           cost: totalCost,
           status: 'pending',
           deadline_type: formData.deadlineType,
@@ -137,23 +149,24 @@ export default function NewOrder() {
 
       if (orderError) throw orderError
 
-      // Insert order materials
-      const orderMaterialsData = selectedMaterials.map(item => ({
-        order_id: orderData.id,
-        material_id: item.material_id,
-        quantity: item.quantity,
-        cost_at_time: item.cost
-      }))
+      if (selectedMaterials.length > 0) {
+        const orderMaterialsData = selectedMaterials.map(item => ({
+          order_id: orderData.id,
+          material_id: item.material_id,
+          quantity: item.quantity,
+          cost_at_time: item.cost
+        }))
 
-      const { error: materialsError } = await supabase
-        .from('order_materials')
-        .insert(orderMaterialsData)
+        const { error: materialsError } = await supabase
+          .from('order_materials')
+          .insert(orderMaterialsData)
 
-      if (materialsError) throw materialsError
+        if (materialsError) throw materialsError
+      }
 
       setAlertMessage({
         type: 'success',
-        message: `Order ${orderNumber} created successfully! Total: Rs. ${totalCost.toFixed(2)}`
+        message: `Order ${orderNumber} created successfully! Total: ${formatLKR(totalCost)}`
       })
 
       setTimeout(() => {
@@ -168,23 +181,21 @@ export default function NewOrder() {
   }
 
   return (
-    <div className="min-h-screen bg-dark">
-      {/* Header */}
-      <header className="bg-dark border-b border-gray-700 sticky top-0 z-40">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark transition-colors duration-200">
+      <header className="bg-white dark:bg-dark-lighter border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <button
             onClick={() => navigate('/dashboard')}
-            className="btn-secondary flex items-center gap-2 mb-4"
+            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary transition-colors mb-4"
           >
             <ArrowLeft size={18} />
             Back to Dashboard
           </button>
-          <h1 className="text-2xl font-bold text-primary">New Order</h1>
-          <p className="text-sm text-gray-400">Create a custom photoframe order</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">New Order</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Create a custom photoframe order</p>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {alertMessage && (
           <Alert
@@ -195,207 +206,112 @@ export default function NewOrder() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Dimensions */}
-          <div className="card">
-            <h2 className="text-xl font-bold text-white mb-4">Frame Dimensions</h2>
-            
+          <div className="bg-white dark:bg-dark-lighter p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Frame Dimensions</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Height (cm) *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Height (inches) *</label>
                 <input
                   type="number"
+                  step="0.1"
                   value={formData.height}
                   onChange={(e) => setFormData({ ...formData, height: e.target.value })}
-                  placeholder="e.g., 30"
+                  placeholder="e.g., 12"
                   required
-                  min="1"
-                  className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:border-primary"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Width (cm) *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Width (inches) *</label>
                 <input
                   type="number"
+                  step="0.1"
                   value={formData.width}
                   onChange={(e) => setFormData({ ...formData, width: e.target.value })}
-                  placeholder="e.g., 40"
+                  placeholder="e.g., 18"
                   required
-                  min="1"
-                  className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Height 2 (cm) - Optional
-                </label>
-                <input
-                  type="number"
-                  value={formData.height2}
-                  onChange={(e) => setFormData({ ...formData, height2: e.target.value })}
-                  placeholder="For multi-panel frames"
-                  min="0"
-                  className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Width 2 (cm) - Optional
-                </label>
-                <input
-                  type="number"
-                  value={formData.width2}
-                  onChange={(e) => setFormData({ ...formData, width2: e.target.value })}
-                  placeholder="For multi-panel frames"
-                  min="0"
-                  className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:border-primary"
                 />
               </div>
             </div>
+            {calculatedCost && (
+              <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Estimated Base Cost:</span>
+                  <span className="text-lg font-bold text-primary">{formatLKR(calculatedCost.total)}</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Includes frame, glass, MDF, labor, and electricity.</p>
+              </div>
+            )}
           </div>
 
-          {/* Materials */}
-          <div className="card">
+          <div className="bg-white dark:bg-dark-lighter p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-white">Materials *</h2>
-              <button
-                type="button"
-                onClick={addMaterial}
-                className="btn-primary flex items-center gap-2 text-sm"
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Additional Materials</h2>
+              <button 
+                type="button" 
+                onClick={addMaterial} 
+                disabled={fetchingMaterials || materials.length === 0}
+                className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
               >
-                <Plus size={16} />
-                Add Material
+                <Plus size={16} /> Add Material
               </button>
             </div>
-
-            {selectedMaterials.length === 0 ? (
-              <p className="text-gray-400 text-sm">No materials selected. Click "Add Material" to start.</p>
-            ) : (
+            
+            {fetchingMaterials ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader className="animate-spin text-primary" size={24} />
+                <span className="ml-2 text-gray-500">Loading materials...</span>
+              </div>
+            ) : selectedMaterials.length > 0 ? (
               <div className="space-y-3">
                 {selectedMaterials.map((item, index) => (
-                  <div key={index} className="flex gap-3 items-start p-3 bg-gray-900/50 rounded-lg">
+                  <div key={index} className="flex gap-3 items-start p-3 bg-gray-50 dark:bg-dark/50 rounded-lg border border-gray-200 dark:border-gray-700">
                     <div className="flex-1">
-                      <label className="block text-xs text-gray-400 mb-1">Material</label>
                       <select
                         value={item.material_id}
                         onChange={(e) => updateMaterial(index, 'material_id', e.target.value)}
-                        className="w-full px-3 py-2 bg-dark border border-gray-600 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        className="w-full px-3 py-2 bg-white dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white"
                       >
-                        {materials.map(material => (
-                          <option key={material.id} value={material.id}>
-                            {material.name} - Rs. {material.cost.toFixed(2)} / {material.unit}
-                          </option>
+                        {materials.map(m => (
+                          <option key={m.id} value={m.id}>{m.name} - {formatLKR(m.cost)}</option>
                         ))}
                       </select>
                     </div>
-
                     <div className="w-24">
-                      <label className="block text-xs text-gray-400 mb-1">Quantity</label>
                       <input
                         type="number"
                         value={item.quantity}
                         onChange={(e) => updateMaterial(index, 'quantity', parseInt(e.target.value))}
                         min="1"
-                        className="w-full px-3 py-2 bg-dark border border-gray-600 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        className="w-full px-3 py-2 bg-white dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white"
                       />
                     </div>
-
-                    <div className="w-28">
-                      <label className="block text-xs text-gray-400 mb-1">Subtotal</label>
-                      <div className="px-3 py-2 bg-dark border border-gray-700 rounded-lg text-sm text-primary font-mono">
-                        Rs. {(item.cost * item.quantity).toFixed(2)}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => removeMaterial(index)}
-                      className="mt-6 text-error hover:text-red-400"
-                    >
+                    <button type="button" onClick={() => removeMaterial(index)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
                       <Trash2 size={18} />
                     </button>
                   </div>
                 ))}
               </div>
+            ) : (
+              <p className="text-center py-4 text-gray-500 text-sm italic">No additional materials selected.</p>
             )}
           </div>
 
-          {/* Deadline */}
-          <div className="card">
-            <h2 className="text-xl font-bold text-white mb-4">Deadline</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Deadline Type *
-                </label>
-                <select
-                  value={formData.deadlineType}
-                  onChange={(e) => setFormData({ ...formData, deadlineType: e.target.value })}
-                  className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="standard">Standard (7 days)</option>
-                  <option value="express">Express (3 days) - Additional charges may apply</option>
-                  <option value="custom">Custom Date</option>
-                </select>
-              </div>
-
-              {formData.deadlineType === 'custom' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Requested Deadline
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.requestedDeadline}
-                    onChange={(e) => setFormData({ ...formData, requestedDeadline: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  />
-                </div>
-              )}
+          <div className="bg-primary/5 border border-primary/20 p-6 rounded-xl shadow-sm">
+            <div className="flex justify-between items-center">
+              <span className="text-xl font-bold text-gray-900 dark:text-white">Total Order Cost</span>
+              <span className="text-3xl font-bold text-primary">{formatLKR(calculateTotalCost())}</span>
             </div>
           </div>
 
-          {/* Notes */}
-          <div className="card">
-            <h2 className="text-xl font-bold text-white mb-4">Additional Notes</h2>
-            <textarea
-              value={formData.customerNotes}
-              onChange={(e) => setFormData({ ...formData, customerNotes: e.target.value })}
-              placeholder="Any special requirements or instructions..."
-              rows="4"
-              className="w-full px-4 py-2 bg-dark border border-gray-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-
-          {/* Cost Summary */}
-          <div className="card bg-gray-900/50 border-2 border-primary/30">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Calculator className="text-primary" size={24} />
-                <div>
-                  <p className="text-sm text-gray-400">Total Estimated Cost</p>
-                  <p className="text-3xl font-bold text-primary">
-                    Rs. {calculateTotalCost().toFixed(2)}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={loading || selectedMaterials.length === 0}
-                className="btn-primary px-8 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Creating Order...' : 'Place Order'}
-              </button>
-            </div>
-          </div>
+          <button 
+            type="submit" 
+            disabled={loading} 
+            className="w-full btn-primary py-4 text-lg font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] transition-transform"
+          >
+            {loading ? <Loader size={24} className="animate-spin" /> : <><Plus size={24} /> Create Order</>}
+          </button>
         </form>
       </main>
     </div>

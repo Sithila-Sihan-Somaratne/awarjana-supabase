@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Alert } from '../components/common/Alert'
+import Alert from '../components/common/Alert'
 import { Mail, Lock, Loader, ArrowLeft, KeyRound, CheckCircle2 } from 'lucide-react'
 import { validatePassword } from '../lib/crypto'
 
@@ -146,7 +146,7 @@ export default function ForgotPassword() {
                     type="text"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    placeholder="Enter 6-digit code"
+                    placeholder="Enter 8-digit code"
                     required
                     className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
                   />

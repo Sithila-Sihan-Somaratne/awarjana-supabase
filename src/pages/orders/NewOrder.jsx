@@ -6,8 +6,7 @@ import { supabase } from '../../lib/supabase'
 import {
   ArrowLeft, Save, Calculator, Package, Ruler,
   DollarSign, AlertCircle, CheckCircle, XCircle
-} from 'lucide-react'
-import Alert from '../../components/common/Alert'
+} from 'lucide-react'import Alert from '../components/common/Alert'
 
 export default function NewOrder() {
   const navigate = useNavigate()
@@ -52,7 +51,6 @@ export default function NewOrder() {
       const { data, error } = await supabase
         .from('materials')
         .select('*')
-        .eq('status', 'active')
         .order('name')
 
       if (error) throw error
@@ -362,7 +360,7 @@ export default function NewOrder() {
                   <option value="material">A material</option>
                   {materials.map((material) => (
                     <option key={material.id} value={material.id}>
-                      {material.name} - ${material.unit_price}/{material.unit} ({material.current_stock} in stock)
+                      {material.name} - ${material.unit_price}/{material.unit} ({material.stock_quantity} in stock)
                     </option>
                   ))}
                 </select>

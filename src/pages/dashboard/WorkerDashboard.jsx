@@ -157,24 +157,24 @@ export default function WorkerDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-dark flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading worker dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading worker dashboard...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark transition-colors duration-200">
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-white dark:bg-dark-lighter shadow dark:shadow-none border-b dark:border-dark-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Worker Dashboard</h1>
-              <p className="text-gray-600 mt-1">Manage your assigned tasks and materials</p>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Worker Dashboard</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your assigned tasks and materials</p>
             </div>
             <div className="flex space-x-3">
               <button
@@ -281,11 +281,11 @@ export default function WorkerDashboard() {
         </div>
 
         {/* Tab Content */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white dark:bg-dark-lighter shadow dark:shadow-none border dark:border-dark-border rounded-lg">
           {activeTab === 'jobcards' && (
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-medium text-gray-900">Assigned Job Cards</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Assigned Job Cards</h2>
                 <div className="flex space-x-3">
                   <select className="block w-full pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md">
                     <option>Filter by status</option>
@@ -368,40 +368,40 @@ export default function WorkerDashboard() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-dark-lighter divide-y divide-gray-200 dark:divide-gray-700">
                       {materials.map((material) => (
                         <tr key={material.id}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="flex-shrink-0 h-10 w-10">
-                                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                  <Wrench className="h-6 w-6 text-gray-500" />
+                                <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                  <Wrench className="h-6 w-6 text-gray-500 dark:text-gray-400" />
                                 </div>
                               </div>
                               <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
                                   {material.material?.name}
                                 </div>
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
                                   {material.material?.sku}
                                 </div>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{material.order?.title}</div>
-                            <div className="text-sm text-gray-500">#{material.order?.order_number}</div>
+                            <div className="text-sm text-gray-900 dark:text-white">{material.order?.title}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">#{material.order?.order_number}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
+                            <div className="text-sm text-gray-900 dark:text-white">
                               {material.required_quantity} {material.material?.unit}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              material.status === 'allocated' ? 'bg-green-100 text-green-800' :
-                              material.status === 'used' ? 'bg-blue-100 text-blue-800' :
-                              'bg-yellow-100 text-yellow-800'
+                              material.status === 'allocated' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+                              material.status === 'used' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' :
+                              'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
                             }`}>
                               {material.status}
                             </span>
@@ -409,7 +409,7 @@ export default function WorkerDashboard() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <button
                               onClick={() => navigate(`/worker/material-usage?material=${material.id}`)}
-                              className="text-blue-600 hover:text-blue-900"
+                              className="text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300"
                             >
                               Record Use
                             </button>

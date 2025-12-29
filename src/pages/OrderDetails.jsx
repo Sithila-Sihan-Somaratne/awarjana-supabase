@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Alert } from '../components/common/Alert'
+import Alert from '../components/common/Alert'
 import { ArrowLeft, Package, Calendar, User, DollarSign, FileText } from 'lucide-react'
 
 export default function OrderDetails() {

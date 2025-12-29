@@ -167,8 +167,8 @@ export default function AnalyticsReports() {
         },
         materials: {
           total: materials?.length || 0,
-          lowStock: materials?.filter(m => m.stock_quantity <= m.low_stock_threshold && m.stock_quantity > 0).length || 0,
-          outOfStock: materials?.filter(m => m.stock_quantity === 0).length || 0
+          lowStock: materials?.filter(m => (m.stock_quantity || 0) <= (m.low_stock_threshold || 0) && (m.stock_quantity || 0) > 0).length || 0,
+          outOfStock: materials?.filter(m => (m.stock_quantity || 0) === 0).length || 0
         },
         topMaterials,
         recentActivity: orders?.slice(0, 10) || []

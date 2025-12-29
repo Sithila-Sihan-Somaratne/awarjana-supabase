@@ -6,7 +6,7 @@ const Sidebar = ({ title, tabs, activeTab, onTabChange, user }) => {
   const { logout } = useAuth();
 
   return (
-    <div className="w-64 bg-gray-900 text-white min-h-screen">
+    <div className="w-64 bg-gray-900 dark:bg-black text-white min-h-screen border-r border-gray-800 dark:border-dark-border">
       <div className="p-6">
         <h1 className="text-xl font-bold mb-2">{title}</h1>
         <div className="flex items-center text-sm text-gray-300">
@@ -32,7 +32,7 @@ const Sidebar = ({ title, tabs, activeTab, onTabChange, user }) => {
         ))}
       </nav>
 
-      <div className="absolute bottom-0 w-64 p-6 border-t border-gray-800">
+      <div className="absolute bottom-0 w-64 p-6 border-t border-gray-800 dark:border-dark-border">
         <button className="flex items-center text-gray-300 hover:text-white">
           <Settings size={18} className="mr-2" />
           Settings
