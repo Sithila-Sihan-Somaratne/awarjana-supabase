@@ -16,13 +16,6 @@ export const MATERIAL_PRICES = {
   ELECTRICITY: 50.0,
 };
 
-// Credit consumption rates
-export const CREDIT_CONSUMPTION = {
-  ORDER_CREATE: 0.10,  // 1 credit per 10 orders
-  ORDER_UPDATE: 0.05,  // 1 credit per 20 updates
-  DRAFT_SUBMIT: 0.05,  // 1 credit per 20 drafts
-};
-
 /**
  * Calculate order cost based on dimensions
  * @param {number} width - Width in inches
@@ -63,8 +56,7 @@ export const calculateOrderCost = (width, height) => {
       others: Math.round(othersCost * 100) / 100,
       labor: Math.round(laborCost * 100) / 100,
     },
-    dimensions: { width, height, area },
-    creditsRequired: CREDIT_CONSUMPTION.ORDER_CREATE,
+    dimensions: { width, height, area }
   };
 };
 
@@ -86,13 +78,11 @@ export const calculateMultiSizeCost = (dimensions) => {
   }
 
   const totalCost = primaryCost.total + (secondaryCost?.total || 0);
-  const totalCredits = primaryCost.creditsRequired + (secondaryCost?.creditsRequired || 0);
 
   return {
     total: totalCost,
     primaryBreakdown: primaryCost.breakdown,
     secondaryBreakdown: secondaryCost?.breakdown || null,
-    creditsRequired: Math.round(totalCredits * 100) / 100,
     hasSecondarySize: !!secondaryCost,
   };
 };
@@ -212,5 +202,4 @@ export default {
   calculateWithDeadline,
   estimateMaterials,
   MATERIAL_PRICES,
-  CREDIT_CONSUMPTION,
 };

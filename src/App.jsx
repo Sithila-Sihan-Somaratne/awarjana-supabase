@@ -1,64 +1,54 @@
 // src/App.jsx
 // Main Application Component with Routing and Providers
 
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-  Outlet,
-} from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
-import { ProtectedRoute } from "./components/common/ProtectedRoute";
-import { ToastProvider } from "./components/ui/Toast";
-import { GlobalThemeToggle } from "./components/GlobalThemeToggle";
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { ToastProvider, useToast } from './components/ui/Toast';
+import { GlobalThemeToggle } from './components/GlobalThemeToggle';
 
 // Pages
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Unauthorized from "./pages/Unauthorized";
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import Unauthorized from './pages/Unauthorized';
 
 // Dashboard Components
-import MainDashboard from "./pages/dashboard/MainDashboard";
-import CustomerDashboard from "./pages/dashboard/CustomerDashboard";
-import WorkerDashboard from "./pages/dashboard/WorkerDashboard";
-import AdminDashboard from "./pages/dashboard/AdminDashboard";
+import MainDashboard from './pages/dashboard/MainDashboard';
+import CustomerDashboard from './pages/dashboard/CustomerDashboard';
+import WorkerDashboard from './pages/dashboard/WorkerDashboard';
+import AdminDashboard from './pages/dashboard/AdminDashboard';
 
 // Order Management
-import NewOrder from "./pages/orders/NewOrder";
-import OrderDetails from "./pages/orders/OrderDetails";
-import OrderTracker from "./pages/orders/OrderTracker";
+import NewOrder from './pages/orders/NewOrder';
+import OrderDetails from './pages/orders/OrderDetails';
+import OrderTracker from './pages/orders/OrderTracker';
 
 // Worker Components
-import JobCards from "./pages/worker/JobCards";
-import MaterialUsage from "./pages/worker/MaterialUsage";
-import SubmitDraft from "./pages/worker/SubmitDraft";
+import JobCards from './pages/worker/JobCards';
+import MaterialUsage from './pages/worker/MaterialUsage';
+import SubmitDraft from './pages/worker/SubmitDraft';
 
 // Admin Components
-import InventoryManagement from "./pages/admin/InventoryManagement";
-import RegistrationCodes from "./pages/admin/RegistrationCodes";
-import AnalyticsReports from "./pages/admin/AnalyticsReports";
-import UserManagement from "./pages/admin/UserManagement";
+import InventoryManagement from './pages/admin/InventoryManagement';
+import RegistrationCodes from './pages/admin/RegistrationCodes';
+import AnalyticsReports from './pages/admin/AnalyticsReports';
+import UserManagement from './pages/admin/UserManagement';
 
 // Profile & Settings
-import Profile from "./pages/Profile";
-import Settings from "./pages/Settings";
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 
 // Main Layout Component
 function MainLayout() {
   const { user, userRole, logout } = useAuth();
   const location = useLocation();
+  const { toast } = useToast();
 
   // Don't show header on auth pages
-  const hideHeader = [
-    "/login",
-    "/signup",
-    "/forgot-password",
-    "/reset-password",
-  ].includes(location.pathname);
+  const hideHeader = ['/login', '/signup', '/forgot-password', '/reset-password'].includes(location.pathname);
 
   if (hideHeader) {
     return <Outlet />;
@@ -75,9 +65,7 @@ function MainLayout() {
                 Awarjana Creations
               </h1>
               <span className="text-sm text-gray-600 dark:text-gray-400 hidden md:inline">
-                {userRole
-                  ? `(${userRole.charAt(0).toUpperCase() + userRole.slice(1)})`
-                  : ""}
+                {userRole ? `(${userRole.charAt(0).toUpperCase() + userRole.slice(1)})` : ''}
               </span>
             </div>
 
@@ -259,6 +247,10 @@ function AppRoutes() {
 
 // Main App Component
 function App() {
+  console.log('🚀 [APP] Initializing Awarjana Creations App...');
+  console.log('📦 [APP] Environment:', import.meta.env.DEV ? 'Development' : 'Production');
+  console.log('🔗 [APP] Supabase URL:', import.meta.env.VITE_SUPABASE_URL ? 'Configured' : 'Not Set');
+
   return (
     <Router>
       <ThemeProvider>

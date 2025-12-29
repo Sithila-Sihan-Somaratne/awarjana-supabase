@@ -358,7 +358,6 @@ export default function NewOrder() {
                   className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >
                   <option value="">Select a material</option>
-                  <option value="material">A material</option>
                   {materials.map((material) => (
                     <option key={material.id} value={material.id}>
                       {material.name} - ${material.unit_price}/{material.unit} ({material.stock_quantity} in stock)

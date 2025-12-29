@@ -11,31 +11,36 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
   const [pendingVerification, setPendingVerification] = useState(null);
 
-  // Check if user exists in BOTH auth.users AND public.users
+  // --- DATABASE VERIFICATION (GHOST BUSTER LOGIC) ---
   const verifyUserExistsInDatabase = async (userId) => {
     try {
-      console.log("🔍 Verifying user exists in database...");
+      console.log("🔍 [AuthContext] Verifying user exists in database...");
       
-      // Check in public.users
-      // Use maybeSingle() to avoid errors if user doesn't exist yet
+      // 1. Check Public Table
       const { data: publicUser, error: publicError } = await supabase
         .from("users")
         .select("id, email, role, email_verified")
         .eq("id", userId)
         .maybeSingle();
 
-      console.log("📊 Database verification result:", {
+      // 2. INTERRUPT: Query Auth server to see if user actually exists in auth.users
+      // This is the safety check against deleted users with active JWTs
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+      console.log("📊 [AuthContext] Database verification result:", {
         existsInPublicUsers: !!publicUser,
-        error: publicError?.message
+        existsInAuth: !!authUser,
+        publicError: publicError?.message,
+        authError: authError?.message
       });
 
       return {
-        exists: !!publicUser,
+        exists: !!publicUser && !!authUser,
         userData: publicUser,
-        error: publicError
+        error: publicError || authError
       };
     } catch (err) {
-      console.error("❌ Database verification error:", err);
+      console.error("❌ [AuthContext] Database verification error:", err);
       return { exists: false, error: err.message };
     }
   };
@@ -48,60 +53,39 @@ export function AuthProvider({ children }) {
         console.log("🔄 [AuthContext] Checking existing session...");
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        console.log("📋 Session check results:", {
-          hasSession: !!session,
-          sessionUser: session?.user?.email,
-          sessionUserId: session?.user?.id,
-          sessionError: sessionError?.message
-        });
-        
         if (!mounted) return;
         
         if (sessionError) {
-          console.error("❌ Session error:", sessionError);
+          console.error("❌ [AuthContext] Session error:", sessionError);
           setError(sessionError.message);
           setLoading(false);
           return;
         }
 
         if (session?.user) {
-          console.log("✅ Active session found for:", session.user.email);
+          console.log("✅ [AuthContext] Active session found for:", session.user.email);
           
-          // CRITICAL: Check JWT metadata first (Fast & Recursion-Proof)
-          const jwtRole = session.user.app_metadata?.role;
-          if (jwtRole) {
-            console.log("🔑 Role found in JWT metadata:", jwtRole);
-            setUserRole(jwtRole);
-          }
-
-          // Verify user actually exists in database
+          // CRITICAL: Verify user is not a "Ghost"
           const verification = await verifyUserExistsInDatabase(session.user.id);
           
+          if (!mounted) return;
+
           if (!verification.exists) {
-            console.warn("⚠️ Session exists but user not found in database! (Ghost Session Detected)");
-            
-            // Force logout since user doesn't exist
+            console.warn("🛑 [AuthContext] Ghost session detected! Purging...");
             await supabase.auth.signOut();
-            setUser(null);
-            setUserRole(null);
-            
-            // Clear EVERYTHING to prevent infinite loops
             localStorage.clear();
             sessionStorage.clear();
-            
-            // Redirect to login if possible
-            window.location.href = '/login';
-            
+            setUser(null);
+            setUserRole(null);
             setError("User account not found. Please sign in again.");
           } else {
-            console.log("✅ User verified in database, proceeding...");
             await handleUserSession(session.user);
           }
         } else {
-          console.log("ℹ️ No active session found - user is logged out");
+          console.log("ℹ️ [AuthContext] No active session found");
         }
       } catch (err) {
-        console.error("❌ Session check error:", err);
+        console.error("❌ [AuthContext] Session check error:", err);
         if (mounted) setError(err.message);
       } finally {
         if (mounted) setLoading(false);
@@ -112,53 +96,22 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("🔄 Auth state changed:", event, {
-          hasSession: !!session,
-          userEmail: session?.user?.email,
-          userId: session?.user?.id
-        });
-
+        console.log("🔄 [AuthContext] Auth state changed:", event);
         if (!mounted) return;
 
         if (event === 'SIGNED_IN' && session?.user) {
-          console.log("✅ User signed in:", session.user.email);
-          
-          // Sync role from JWT immediately
-          const jwtRole = session.user.app_metadata?.role;
-          if (jwtRole) setUserRole(jwtRole);
-
-          // Verify user exists before proceeding
-          const verification = await verifyUserExistsInDatabase(session.user.id);
-          if (!verification.exists) {
-            console.error("❌ Signed in but user not found in database!");
-            // Wait a tiny bit for trigger to finish
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            const retryVerification = await verifyUserExistsInDatabase(session.user.id);
-            if (!retryVerification.exists) {
-              await supabase.auth.signOut();
-              return;
-            }
-          }
-          
           await handleUserSession(session.user);
         } else if (event === 'SIGNED_OUT') {
-          console.log("🚪 User signed out or session expired");
+          console.log("🚪 [AuthContext] User signed out");
           setUser(null);
           setUserRole(null);
           setPendingVerification(null);
-          
-          // Clear any stale localStorage data
-          localStorage.removeItem(`sb-${import.meta.env.VITE_SUPABASE_URL.replace(/[^a-zA-Z0-9]/g, '-')}-auth-token`);
-        } else if (event === 'USER_UPDATED') {
-          console.log("👤 User data updated");
-        } else if (event === 'TOKEN_REFRESHED') {
-          console.log("🔄 Token refreshed");
+          localStorage.clear();
         }
       }
     );
 
     return () => {
-      console.log("🧹 [AuthContext] Cleaning up...");
       mounted = false;
       subscription?.unsubscribe();
     };
@@ -166,175 +119,44 @@ export function AuthProvider({ children }) {
 
   const handleUserSession = async (user) => {
     console.log("👤 [AuthContext] Handling user session for:", user.id);
-    console.log("   User email:", user.email);
-    
     setUser(user);
 
     try {
-      // NEW: Check JWT metadata first to avoid recursion
+      // Sync role from JWT metadata immediately for speed
       const jwtRole = user.app_metadata?.role;
       if (jwtRole) {
-        console.log("🔑 Role found in JWT metadata:", jwtRole);
+        console.log("🔑 [AuthContext] Role found in JWT:", jwtRole);
         setUserRole(jwtRole);
       }
 
-      console.log("🔍 Fetching user role from database...");
+      // Sync role and verification from Database for accuracy
       const { data, error: userError } = await supabase
         .from("users")
         .select("role, email_verified")
         .eq("id", user.id)
         .maybeSingle();
 
-      console.log("📊 User role query results:", {
-        dataFound: !!data,
-        role: data?.role,
-        emailVerified: data?.email_verified,
-        error: userError?.message
-      });
-
-      if (userError) {
-        console.warn("⚠️ User role fetch error:", userError.message);
-        if (!jwtRole) setUserRole("customer");
-      } else if (!data) {
-        console.warn("⚠️ No user data found - forcing logout");
-        await supabase.auth.signOut();
-        setUser(null);
-        setUserRole(null);
-        setError("User account not found. Please sign in again.");
+      if (userError || !data) {
+        console.warn("⚠️ [AuthContext] Data mismatch. Logging out.");
+        await logout();
       } else {
-        const role = data?.role || "customer";
-        console.log("✅ User role set to:", role);
+        const role = data.role || "customer";
         setUserRole(role);
 
-        // SYNC FIX: If public table is out of sync with Auth, update it
+        // Sync verification status if database is lagging
         const isEmailVerified = !!user.email_confirmed_at;
         if (data.email_verified !== isEmailVerified) {
-          console.log("🔄 Syncing email_verified status to database...");
-          await supabase
-            .from("users")
-            .update({ email_verified: isEmailVerified })
-            .eq("id", user.id);
+          console.log("🔄 [AuthContext] Syncing verification status...");
+          await supabase.from("users").update({ email_verified: isEmailVerified }).eq("id", user.id);
         }
       }
     } catch (err) {
-      console.warn("⚠️ User session error:", err.message);
+      console.warn("⚠️ [AuthContext] Session handler error:", err.message);
       if (!userRole) setUserRole("customer");
     }
   };
 
-  const validateRegistrationCode = async (code, role) => {
-    try {
-      console.log("🔍 [DEBUG - START] Validating Code:");
-      console.log("   Input Code (Raw):", `"${code}"`);
-      console.log("   Input Role (Raw):", `"${role}"`);
-
-      if (!code || !role) {
-        console.log("❌ Missing code or role");
-        return { valid: false, message: "Code and role are required" };
-      }
-
-      const hashedCode = await hashString(code);
-      console.log("   Hashed Code:", hashedCode);
-      console.log("   Role (for DB query):", `"${role}"`);
-
-      // Log the actual Supabase query being built
-      console.log("   🛠️  Executing DB Query with:");
-      console.log('     .eq("code",', `"${hashedCode}")`);
-      console.log('     .eq("role",', `"${role}")`);
-
-      const { data, error } = await supabase
-        .from("registration_codes")
-        .select("*")
-        .eq("code", hashedCode)
-        .eq("role", role)
-        .maybeSingle();
-
-      console.log("✅ Query completed.");
-      console.log("   Data returned:", data);
-      console.log("   Error (if any):", error);
-      console.log("   Raw SQL would be:");
-      console.log(`     SELECT * FROM registration_codes WHERE code = '${hashedCode}' AND role = '${role}'`);
-
-      if (error) {
-        console.error("❌ Database error:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        
-        // Check for RLS violation
-        if (error.code === '42501' || error.message.includes('permission denied')) {
-          console.log("   🔒 RLS Policy violation detected!");
-          return { 
-            valid: false, 
-            message: "Permission denied. Check RLS policies on registration_codes table." 
-          };
-        }
-        
-        return { valid: false, message: "Database error during validation" };
-      }
-
-      if (!data) {
-        console.log("❌ No matching code found. Possible reasons:");
-        console.log("   1. Code doesn't exist in database");
-        console.log("   2. Role doesn't match");
-        console.log("   3. RLS policy blocking access");
-        
-        // Let's check if ANY code exists with this hash
-        console.log("   🔍 Checking if any code exists with this hash...");
-        const { data: anyCodeData, error: anyCodeError } = await supabase
-          .from("registration_codes")
-          .select("role, is_used, created_at")
-          .eq("code", hashedCode)
-          .maybeSingle();
-          
-        if (anyCodeError) {
-          console.log("   ❌ Error checking for any code:", anyCodeError);
-        } else if (anyCodeData) {
-          console.log("   ⚠️ Found code with different role:", anyCodeData);
-          return {
-            valid: false,
-            message: `Code exists but is for ${anyCodeData.role} role, not ${role}`
-          };
-        } else {
-          console.log("   ℹ️ No code found with this hash in database");
-        }
-        
-        return {
-          valid: false,
-          message: "Invalid registration code or role mismatch",
-        };
-      }
-
-      console.log("✅ Code found in database:", {
-        id: data.id,
-        role: data.role,
-        is_used: data.is_used,
-        created_at: data.created_at,
-        used_by: data.used_by
-      });
-
-      if (data.is_used) {
-        console.log("❌ Code already used by user:", data.used_by);
-        return {
-          valid: false,
-          message: "Registration code has already been used",
-        };
-      }
-
-      console.log("🎉 Code validation successful!");
-      return { valid: true, codeData: data };
-    } catch (err) {
-      console.error("🔥 Unexpected error in validateRegistrationCode:", {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      });
-      return { valid: false, message: "Error validating code" };
-    }
-  };
-
+  // --- REGISTRATION CODE LOGIC ---
   const hashString = async (str) => {
     try {
       const encoder = new TextEncoder();
@@ -343,260 +165,118 @@ export function AuthProvider({ children }) {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
     } catch (err) {
-      console.error("❌ Hashing error:", err);
+      console.error("❌ [AuthContext] Hashing error:", err);
       throw err;
     }
   };
 
+  const validateRegistrationCode = async (code, role) => {
+    try {
+      console.log("🔍 [AuthContext] Validating Code for role:", role);
+      const hashedCode = await hashString(code);
+      
+      const { data, error } = await supabase
+        .from("registration_codes")
+        .select("*")
+        .eq("code", hashedCode)
+        .eq("role", role)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return { valid: false, message: "Invalid code or role mismatch" };
+      if (data.is_used) return { valid: false, message: "Code already used" };
+
+      console.log("✅ [AuthContext] Code valid!");
+      return { valid: true, codeData: data };
+    } catch (err) {
+      console.error("❌ [AuthContext] Code validation error:", err);
+      return { valid: false, message: "Error validating code" };
+    }
+  };
+
+  // --- AUTH ACTIONS ---
+  const login = async (email, password) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.toLowerCase().trim(),
+        password,
+      });
+      if (error) throw error;
+      
+      const verification = await verifyUserExistsInDatabase(data.user.id);
+      if (!verification.exists) throw new Error("Account records not found.");
+      
+      await handleUserSession(data.user);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: formatErrorMessage(err) };
+    }
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setUserRole(null);
+    localStorage.clear();
+    return { success: true };
+  };
+
   const requestSignupOTP = async (email, password, role, registrationCodeId) => {
     try {
-      console.log("📝 Requesting signup OTP for:", email);
-      setError(null);
       const { data, error } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
         options: {
-          data: {
-            role: role,
-            registration_code_id: registrationCodeId,
-          },
+          data: { role, registration_code_id: registrationCodeId },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
-
-      console.log("📤 Signup response:", {
-        hasUser: !!data.user,
-        userEmail: data.user?.email,
-        error: error?.message
-      });
-
       if (error) throw error;
-
-      setPendingVerification({
-        email: email.toLowerCase().trim(),
-        password,
-        role,
-        registrationCodeId,
-      });
-
-      console.log("✅ Signup OTP requested successfully");
+      setPendingVerification({ email, password, role, registrationCodeId });
       return { success: true };
     } catch (err) {
-      console.error("❌ Signup error:", err);
-      const formattedError = formatErrorMessage(err);
-      setError(formattedError);
-      return { success: false, error: formattedError };
+      return { success: false, error: formatErrorMessage(err) };
     }
   };
 
   const verifySignupOTP = async (email, token) => {
     try {
-      console.log("🔑 Verifying OTP for:", email);
-      setError(null);
       const { data, error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase().trim(),
         token,
         type: "signup",
       });
-
-      console.log("📤 Verification response:", {
-        hasUser: !!data.user,
-        userEmail: data.user?.email,
-        error: error?.message
-      });
-
       if (error) throw error;
-
       if (data.user) {
-        console.log("✅ Verification successful, syncing status...");
-        // FORCE SYNC: Ensure public table is updated immediately
-        await supabase
-          .from("users")
-          .update({ email_verified: true })
-          .eq("id", data.user.id);
-          
+        await supabase.from("users").update({ email_verified: true }).eq("id", data.user.id);
         await handleUserSession(data.user);
       }
-
-      return {
-        success: true,
-        user: data.user,
-        session: data.session,
-        message: "Email verified successfully!",
-      };
-    } catch (err) {
-      console.error("❌ Verification error:", err);
-      const formattedError = formatErrorMessage(err);
-      setError(formattedError);
-      return { success: false, error: formattedError };
-    }
-  };
-
-  const resendSignupOTP = async (email) => {
-    try {
-      console.log("🔄 Resending OTP to:", email);
-      setError(null);
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: email.toLowerCase().trim(),
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      console.log("📤 Resend response:", { error: error?.message });
-
-      if (error) throw error;
-
-      console.log("✅ New OTP sent");
-      return {
-        success: true,
-        message: "New verification code sent! Please check your email.",
-      };
-    } catch (err) {
-      console.error("❌ Resend error:", err);
-      const formattedError = formatErrorMessage(err);
-      setError(formattedError);
-      return { success: false, error: formattedError };
-    }
-  };
-
-  const login = async (email, password) => {
-    try {
-      console.log("🔐 Attempting login for:", email);
-      setError(null);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase().trim(),
-        password,
-      });
-
-      console.log("📤 Login response:", {
-        hasUser: !!data.user,
-        userEmail: data.user?.email,
-        error: error?.message
-      });
-
-      if (error) throw error;
-      
-      // Verify user exists in database after login
-      const verification = await verifyUserExistsInDatabase(data.user.id);
-      if (!verification.exists) {
-        console.error("❌ Login succeeded but user not in database!");
-        await supabase.auth.signOut();
-        throw new Error("Account not found. Please contact support.");
-      }
-      
-      await handleUserSession(data.user);
-      console.log("✅ Login successful");
-      return { success: true, user: data.user };
-    } catch (err) {
-      console.error("❌ Login error:", err);
-      const formattedError = formatErrorMessage(err);
-      setError(formattedError);
-      return { success: false, error: formattedError };
-    }
-  };
-
-  const logout = async () => {
-    try {
-      console.log("🚪 Logging out...");
-      const { error } = await supabase.auth.signOut();
-      console.log("📤 Logout response:", { error: error?.message });
-      
-      if (error) throw error;
-      setUser(null);
-      setUserRole(null);
-      setPendingVerification(null);
-      console.log("✅ Logout successful");
       return { success: true };
     } catch (err) {
-      console.error("❌ Logout error:", err);
-      const formattedError = formatErrorMessage(err);
-      setError(formattedError);
-      return { success: false, error: formattedError };
+      return { success: false, error: formatErrorMessage(err) };
     }
   };
 
   const forgotPassword = async (email) => {
     try {
-      console.log("🔑 Requesting password reset for:", email);
       const { error } = await supabase.auth.resetPasswordForEmail(
         email.toLowerCase().trim(),
-        {
-          redirectTo: `${window.location.origin}/reset-password`,
-        }
+        { redirectTo: `${window.location.origin}/reset-password` }
       );
-
-      console.log("📤 Forgot password response:", { error: error?.message });
-
       if (error) throw error;
-
-      console.log("✅ Password reset email sent");
-      return {
-        success: true,
-        message: "Password reset email sent. Check your inbox.",
-      };
+      return { success: true };
     } catch (err) {
-      console.error("❌ Forgot password error:", err);
-      const formattedError = formatErrorMessage(err);
-      setError(formattedError);
-      return { success: false, error: formattedError };
+      return { success: false, error: formatErrorMessage(err) };
     }
   };
 
   const resetPassword = async (newPassword) => {
     try {
-      console.log("🔄 Resetting password...");
-      const passwordValidation = validatePassword(newPassword);
-      if (!passwordValidation.valid) {
-        console.log("❌ Password validation failed:", passwordValidation.errors[0]);
-        throw new Error(passwordValidation.errors[0]);
-      }
-
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
-      console.log("📤 Reset password response:", { error: error?.message });
-
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-
-      console.log("✅ Password reset successful");
-      return { success: true, message: "Password updated successfully" };
+      return { success: true };
     } catch (err) {
-      console.error("❌ Reset password error:", err);
-      const formattedError = formatErrorMessage(err);
-      setError(formattedError);
-      return { success: false, error: formattedError };
-    }
-  };
-
-  const testDatabaseConnection = async () => {
-    try {
-      console.log("🧪 Testing database connection...");
-      const { data, error } = await supabase
-        .from('registration_codes')
-        .select('id')
-        .limit(1);
-      
-      console.log("📊 Database test result:", { 
-        hasData: !!data?.length, 
-        error: error?.message,
-        success: !error 
-      });
-      
-      if (error) {
-        return { 
-          success: false, 
-          error: `Database error: ${error.message}. Check RLS policies.` 
-        };
-      }
-      
-      console.log("✅ Database connection successful");
-      return { success: true, data };
-    } catch (error) {
-      console.error("❌ Test failed:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: formatErrorMessage(err) };
     }
   };
 
@@ -606,14 +286,13 @@ export function AuthProvider({ children }) {
     loading,
     error,
     pendingVerification,
-    requestSignupOTP,
-    verifySignupOTP,
-    resendSignupOTP,
     login,
     logout,
+    requestSignupOTP,
+    verifySignupOTP,
+    validateRegistrationCode,
     forgotPassword,
     resetPassword,
-    testDatabaseConnection,
     isAuthenticated: !!user,
   };
 
@@ -622,8 +301,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 }
