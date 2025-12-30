@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { 
   Hammer, ClipboardList, CheckCircle2, 
   Loader, AlertTriangle, Briefcase, 
-  ChevronRight, Calendar 
+  TrendingUp, Calendar 
 } from 'lucide-react';
 import OrderCard from '../../components/common/OrderCard';
 
@@ -32,6 +32,21 @@ export default function WorkerDashboard() {
     }
   };
 
+  // Function to move status forward
+  const handleStatusUpdate = async (orderId, newStatus) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      fetchTasks(); // Reload the list
+    } catch (err) {
+      alert("Error updating status: " + err.message);
+    }
+  };
+
   useEffect(() => {
     if (user?.id) fetchTasks();
   }, [user]);
@@ -56,26 +71,20 @@ export default function WorkerDashboard() {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <div className="flex items-center gap-5">
-            <div className="p-4 bg-orange-600 rounded-[1.5rem] text-white shadow-2xl shadow-orange-500/30">
+            <div className="p-4 bg-orange-600 rounded-[1.5rem] text-white shadow-2xl">
               <Hammer size={32} />
             </div>
             <div>
               <h1 className="text-4xl font-black dark:text-white tracking-tight">Workshop Floor</h1>
-              <p className="text-gray-500 font-bold dark:text-gray-400 uppercase text-xs tracking-tighter">Production & Craftsmanship</p>
+              <p className="text-gray-500 font-bold dark:text-gray-400 uppercase text-xs">Production Dashboard</p>
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 p-2 rounded-2xl shadow-sm border dark:border-gray-700 flex gap-2">
-            <button 
-              onClick={() => setFilter('all')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'all' ? 'bg-orange-600 text-white' : 'text-gray-500'}`}
-            >
-              All
+            <button onClick={() => setFilter('all')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'all' ? 'bg-orange-600 text-white' : 'text-gray-500'}`}>
+              All Jobs
             </button>
-            <button 
-              onClick={() => setFilter('pending')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'pending' ? 'bg-orange-600 text-white' : 'text-gray-500'}`}
-            >
-              Active
+            <button onClick={() => setFilter('pending')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'pending' ? 'bg-orange-600 text-white' : 'text-gray-500'}`}>
+              Active Tasks
             </button>
           </div>
         </div>
@@ -83,26 +92,18 @@ export default function WorkerDashboard() {
         {/* Productivity Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
           <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-800 rounded-[2.5rem] p-10 text-white shadow-2xl">
-            <Briefcase className="absolute -right-4 -bottom-4 opacity-10" size={160} />
-            <div className="relative z-10">
-              <p className="text-blue-100 font-bold uppercase tracking-[0.2em] text-xs mb-2">My Active Queue</p>
-              <p className="text-7xl font-black mb-4">{myTasks.filter(t => t.status !== 'completed').length}</p>
-              <div className="flex items-center gap-2 text-sm bg-white/10 w-fit px-4 py-1.5 rounded-full">
-                <Calendar size={14} />
-                <span>Updated just now</span>
-              </div>
+            <p className="text-blue-100 font-bold uppercase tracking-[0.2em] text-xs mb-2">My Active Queue</p>
+            <p className="text-7xl font-black mb-4">{myTasks.filter(t => t.status !== 'completed').length}</p>
+            <div className="flex items-center gap-2 text-sm bg-white/10 w-fit px-4 py-1.5 rounded-full">
+              <Calendar size={14} /> <span>Status: Live</span>
             </div>
           </div>
 
           <div className="relative overflow-hidden bg-gradient-to-br from-green-600 to-emerald-800 rounded-[2.5rem] p-10 text-white shadow-2xl">
-            <CheckCircle2 className="absolute -right-4 -bottom-4 opacity-10" size={160} />
-            <div className="relative z-10">
-              <p className="text-green-100 font-bold uppercase tracking-[0.2em] text-xs mb-2">Total Finished</p>
-              <p className="text-7xl font-black mb-4">{myTasks.filter(t => t.status === 'completed').length}</p>
-              <div className="flex items-center gap-2 text-sm bg-white/10 w-fit px-4 py-1.5 rounded-full">
-                <TrendingUp size={14} />
-                <span>Craftsmanship Excellence</span>
-              </div>
+            <p className="text-green-100 font-bold uppercase tracking-[0.2em] text-xs mb-2">Total Finished</p>
+            <p className="text-7xl font-black mb-4">{myTasks.filter(t => t.status === 'completed').length}</p>
+            <div className="flex items-center gap-2 text-sm bg-white/10 w-fit px-4 py-1.5 rounded-full">
+              <TrendingUp size={14} /> <span>Excellence Rating: 100%</span>
             </div>
           </div>
         </div>
@@ -114,22 +115,22 @@ export default function WorkerDashboard() {
             <h3 className="text-2xl font-black dark:text-white">Assigned Job Sheets</h3>
           </div>
 
-          {getFilteredTasks().length > 0 ? (
-            <div className="grid grid-cols-1 gap-6">
-              {getFilteredTasks().map(task => (
-                <div key={task.id} className="relative group">
-                  <OrderCard order={task} userRole="worker" />
-                  <div className="absolute right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all">
-                    <ChevronRight className="text-blue-500" size={32} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {getFilteredTasks().map(task => (
+              <OrderCard 
+                key={task.id} 
+                order={task} 
+                userRole="worker" 
+                onAction={handleStatusUpdate} // Passing the update function
+              />
+            ))}
+          </div>
+
+          {getFilteredTasks().length === 0 && (
             <div className="bg-white dark:bg-gray-800 p-24 rounded-[3rem] text-center shadow-sm border dark:border-gray-700">
               <AlertTriangle className="mx-auto text-orange-400 mb-6" size={64} />
-              <h4 className="text-2xl font-black dark:text-white mb-2">Queue Empty</h4>
-              <p className="text-gray-500 dark:text-gray-400 max-w-sm mx-auto">You currently have no workshop tasks assigned to your queue. Check in with Admin for new jobs.</p>
+              <h4 className="text-2xl font-black dark:text-white">Queue Empty</h4>
+              <p className="text-gray-500">No workshop tasks assigned to your queue.</p>
             </div>
           )}
         </div>
