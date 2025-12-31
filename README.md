@@ -2,8 +2,9 @@
 
 A modern, production-ready web application for managing photoframe orders, inventory, and production workflow. Built with **React**, **Supabase**, and **Tailwind CSS** with **shadcn/ui** components.
 
-## 🚀 Features
+## 🚀 Features (ongoing!)
 
+<<<<<<< HEAD
 ### 🔐 Authentication & Security
 - **Supabase Auth** - Email/Password authentication with PKCE flow.
 - **Email & SMS Verification** - Secure account verification via Email or SMS.
@@ -11,6 +12,16 @@ A modern, production-ready web application for managing photoframe orders, inven
 - **Registration Codes** - Secure Employer and Admin signup with a system limit of 10 codes.
 - **Session Tracker** - Logs login activity and user sessions for security monitoring.
 - **Password Reset** - Secure forgot password flow with OTP verification.
+=======
+### 🔐 Authentication
+- **Supabase Auth** - Email/Password authentication
+- **Email verification** - Secure account verification
+- **Role-based access control** - Customer, Worker, Admin roles
+- **Registration codes** - Secure Worker and Admin signup
+- **Password reset** - Forgot password flow with OTP
+- **SMS through phone** - For verification, when registeing and resetting password, in case user doesn't select email.
+- **Session tracker** - To make sure it doesn't make the system crash.
+>>>>>>> 175a423780dc97c7b0d418ad2e45326db9985f8f
 
 ### 👥 Customer Features
 - **Order Management** - Place new orders with custom frame dimensions and material selection.
@@ -78,7 +89,11 @@ A modern, production-ready web application for managing photoframe orders, inven
 
 ## 🚀 Deployment
 
+<<<<<<< HEAD
 The project is pre-configured for **Netlify** deployment.
+=======
+## 📁 Project Structure (To be updated!)
+>>>>>>> 175a423780dc97c7b0d418ad2e45326db9985f8f
 
 1. Connect your repository to Netlify.
 2. Set the environment variables in the Netlify dashboard.
