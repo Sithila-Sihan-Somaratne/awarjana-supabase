@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // --- 2. SESSION HANDLER ---
+  // --- 2. SESSION HANDLER & TRACKER ---
   const handleUserSession = useCallback(async (authUser) => {
     if (!authUser) {
       setUser(null);
@@ -61,7 +61,6 @@ export function AuthProvider({ children }) {
 
       if (uErr || !data) {
         console.warn("⚠️ Data mismatch detected.");
-        // If they don't exist in our 'users' table, they shouldn't be logged in
       } else {
         setUserRole(data.role || "customer");
         
@@ -71,6 +70,17 @@ export function AuthProvider({ children }) {
           await supabase.from("users").update({ email_verified: isVerified }).eq("id", authUser.id);
         }
       }
+
+      // Session Tracker: Log login activity
+      await supabase.from("activity_logs").insert({
+        user_id: authUser.id,
+        action_type: "login",
+        action_details: { 
+          user_agent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
+      });
+
     } catch (err) {
       console.warn("Session sync warning:", err.message);
     }
@@ -169,6 +179,19 @@ export function AuthProvider({ children }) {
 
   const requestSignupOTP = async (email, password, role, registrationCodeId) => {
     try {
+      // If registration code is provided, validate it first
+      if (registrationCodeId) {
+        const { data: codeData, error: codeError } = await supabase
+          .from("registration_codes")
+          .select("id, is_used")
+          .eq("id", registrationCodeId)
+          .single();
+        
+        if (codeError || !codeData || codeData.is_used) {
+          throw new Error("Registration code is invalid or already used.");
+        }
+      }
+
       const { error } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
@@ -185,7 +208,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const verifySignupOTP = async (email, token) => {
+  const verifySignupOTP = async (email, token, registrationCodeId) => {
     try {
       const { data, error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase().trim(),
@@ -193,8 +216,20 @@ export function AuthProvider({ children }) {
         type: "signup",
       });
       if (error) throw error;
+      
       if (data.user) {
+        // Update user verification status
         await supabase.from("users").update({ email_verified: true }).eq("id", data.user.id);
+        
+        // If there was a registration code, mark it as used
+        if (registrationCodeId) {
+          await supabase.from("registration_codes").update({
+            is_used: true,
+            used_by: data.user.id,
+            used_at: new Date().toISOString()
+          }).eq("id", registrationCodeId);
+        }
+        
         await handleUserSession(data.user);
       }
       return { success: true };

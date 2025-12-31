@@ -10,8 +10,8 @@ import Alert from '../../components/common/Alert';
 
 export default function AdminDashboard() {
   const [data, setData] = useState({ 
-    orders: [], workers: [], codes: [],
-    stats: { totalValue: 0, orderCount: 0, workerCount: 0, pendingCount: 0 } 
+    orders: [], employers: [], codes: [],
+    stats: { totalValue: 0, orderCount: 0, employerCount: 0, pendingCount: 0 } 
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,18 +21,18 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       const { data: orders } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-      const { data: workers } = await supabase.from('users').select('*').eq('role', 'worker');
+      const { data: employers } = await supabase.from('users').select('*').eq('role', 'employer');
       const { data: codes } = await supabase.from('registration_codes').select('*').order('created_at', { ascending: false });
 
       const totalLKR = orders?.reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0) || 0;
 
       setData({
         orders: orders || [],
-        workers: workers || [],
+        employers: employers || [],
         codes: codes || [],
         stats: {
           orderCount: orders?.length || 0,
-          workerCount: workers?.length || 0,
+          employerCount: employers?.length || 0,
           pendingCount: orders?.filter(o => o.status === 'pending').length || 0,
           totalValue: totalLKR 
         }
@@ -55,16 +55,16 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAssignWorker = async (orderId, workerId) => {
-    if (!workerId) return;
+  const handleAssignEmployer = async (orderId, employerId) => {
+    if (!employerId) return;
     setAssigningId(orderId);
     try {
-      // 1. Create the Job Card (This makes it appear on the Worker's Dashboard)
+      // 1. Create the Job Card (This makes it appear on the Employer's Dashboard)
       const { error: jobError } = await supabase
         .from('job_cards')
         .insert([{ 
           order_id: orderId, 
-          worker_id: workerId, 
+          employer_id: employerId, 
           status: 'assigned' 
         }]);
 
@@ -125,7 +125,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <StatsCard title="Total Orders" value={data.stats.orderCount} icon={Package} color="blue" />
           <StatsCard title="Needs Staff" value={data.stats.pendingCount} icon={Clock} color="amber" />
-          <StatsCard title="Workshop Staff" value={data.stats.workerCount} icon={Users} color="green" />
+          <StatsCard title="Workshop Staff" value={data.stats.employerCount} icon={Users} color="green" />
           <StatsCard title="Active Codes" value={data.codes.filter(c => !c.used).length} icon={Hash} color="indigo" />
         </div>
 
@@ -147,11 +147,11 @@ export default function AdminDashboard() {
                     {order.status === 'pending' ? (
                       <select 
                         disabled={assigningId === order.id}
-                        onChange={(e) => handleAssignWorker(order.id, e.target.value)}
+                        onChange={(e) => handleAssignEmployer(order.id, e.target.value)}
                         className="text-sm border rounded-lg p-2 dark:bg-gray-800 dark:text-white outline-none"
                       >
                         <option value="">Assign Staff...</option>
-                        {data.workers.map(w => <option key={w.id} value={w.id}>{w.email.split('@')[0]}</option>)}
+                        {data.employers.map(w => <option key={w.id} value={w.id}>{w.email.split('@')[0]}</option>)}
                       </select>
                     ) : (
                       <div className="flex items-center gap-2 text-green-600 font-bold text-xs"><CheckCircle size={14}/> ASSIGNED</div>

@@ -14,7 +14,7 @@ export default function OrderDetails() {
   const [order, setOrder] = useState(null)
   const [orderMaterials, setOrderMaterials] = useState([])
   const [customer, setCustomer] = useState(null)
-  const [worker, setWorker] = useState(null)
+  const [employer, setEmployer] = useState(null)
   const [alertMessage, setAlertMessage] = useState(null)
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function OrderDetails() {
         throw new Error('You do not have permission to view this order')
       }
 
-      if (userRole === 'worker' && orderData.assigned_worker_id !== user.id) {
+      if (userRole === 'employer' && orderData.assigned_employer_id !== user.id) {
         throw new Error('You do not have permission to view this order')
       }
 
@@ -76,15 +76,15 @@ export default function OrderDetails() {
         setCustomer(customerData)
       }
 
-      // Fetch worker info
-      if (orderData.assigned_worker_id) {
-        const { data: workerData } = await supabase
+      // Fetch employer info
+      if (orderData.assigned_employer_id) {
+        const { data: employerData } = await supabase
           .from('users')
           .select('email')
-          .eq('id', orderData.assigned_worker_id)
+          .eq('id', orderData.assigned_employer_id)
           .single()
         
-        setWorker(workerData)
+        setEmployer(employerData)
       }
 
     } catch (err) {
@@ -325,8 +325,8 @@ export default function OrderDetails() {
                   <p className="text-white font-medium">{customer?.email || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Assigned Worker</p>
-                  <p className="text-white font-medium">{worker?.email || 'Not assigned yet'}</p>
+                  <p className="text-sm text-gray-400">Assigned Employer</p>
+                  <p className="text-white font-medium">{employer?.email || 'Not assigned yet'}</p>
                 </div>
               </div>
             </div>

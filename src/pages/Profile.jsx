@@ -1,10 +1,9 @@
-// src/pages/Profile.jsx
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import {
-  User, Mail, Calendar, Shield, Edit2, Save, X, CheckCircle
+  User, Mail, Calendar, Shield, Edit2, Save, X, CheckCircle, Phone, MapPin, Building
 } from 'lucide-react'
 import Alert from '../components/common/Alert'
 import LoadingSpinner from '../components/common/LoadingSpinner'
@@ -46,24 +45,12 @@ export default function Profile() {
 
       if (userError) throw userError
 
-      // Fetch profile data if exists
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
-      // Profile might not exist yet, that's okay
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Profile fetch error:', profileError)
-      }
-
-      setProfile({ ...userData, ...profileData })
+      setProfile(userData)
       setFormData({
-        full_name: profileData?.full_name || '',
-        phone: profileData?.phone || '',
-        address: profileData?.address || '',
-        company_name: profileData?.company_name || ''
+        full_name: userData?.full_name || '',
+        phone: userData?.phone || '',
+        address: userData?.address || '',
+        company_name: userData?.company_name || ''
       })
     } catch (err) {
       console.error('Error fetching profile:', err)
@@ -79,35 +66,15 @@ export default function Profile() {
       setError(null)
       setSuccess(null)
 
-      // Check if profile exists
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          ...formData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
 
-      if (existingProfile) {
-        // Update existing profile
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            ...formData,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-
-        if (updateError) throw updateError
-      } else {
-        // Create new profile
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: user.id,
-            ...formData
-          })
-
-        if (insertError) throw insertError
-      }
+      if (updateError) throw updateError
 
       setSuccess('Profile updated successfully!')
       setIsEditing(false)
@@ -122,7 +89,7 @@ export default function Profile() {
     switch (role) {
       case 'admin':
         return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
-      case 'worker':
+      case 'employer':
         return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
       case 'customer':
         return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
@@ -236,39 +203,54 @@ export default function Profile() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Full Name
                   </label>
-                  <input
-                    type="text"
-                    value={formData.full_name}
-                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="Enter your full name"
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User size={18} className="text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={formData.full_name}
+                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="Enter your full name"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Phone Number
                   </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="Enter your phone number"
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Phone size={18} className="text-gray-400" />
+                    </div>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="Enter your phone number"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Address
                   </label>
-                  <textarea
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="Enter your address"
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 pt-2 flex items-start pointer-events-none">
+                      <MapPin size={18} className="text-gray-400" />
+                    </div>
+                    <textarea
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      rows={3}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="Enter your address"
+                    />
+                  </div>
                 </div>
 
                 {userRole === 'customer' && (
@@ -276,13 +258,18 @@ export default function Profile() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Company Name (Optional)
                     </label>
-                    <input
-                      type="text"
-                      value={formData.company_name}
-                      onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="Enter your company name"
-                    />
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Building size={18} className="text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.company_name}
+                        onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        placeholder="Enter your company name"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -309,33 +296,45 @@ export default function Profile() {
               </form>
             ) : (
               <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Full Name</p>
-                  <p className="text-gray-900 dark:text-white font-medium">
-                    {formData.full_name || 'Not provided'}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <User size={18} className="text-gray-400" />
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Full Name</p>
+                    <p className="text-gray-900 dark:text-white font-medium">
+                      {formData.full_name || 'Not provided'}
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Phone Number</p>
-                  <p className="text-gray-900 dark:text-white font-medium">
-                    {formData.phone || 'Not provided'}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <Phone size={18} className="text-gray-400" />
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Phone Number</p>
+                    <p className="text-gray-900 dark:text-white font-medium">
+                      {formData.phone || 'Not provided'}
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Address</p>
-                  <p className="text-gray-900 dark:text-white font-medium">
-                    {formData.address || 'Not provided'}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <MapPin size={18} className="text-gray-400" />
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Address</p>
+                    <p className="text-gray-900 dark:text-white font-medium">
+                      {formData.address || 'Not provided'}
+                    </p>
+                  </div>
                 </div>
 
                 {userRole === 'customer' && formData.company_name && (
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Company Name</p>
-                    <p className="text-gray-900 dark:text-white font-medium">
-                      {formData.company_name}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <Building size={18} className="text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Company Name</p>
+                      <p className="text-gray-900 dark:text-white font-medium">
+                        {formData.company_name}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>

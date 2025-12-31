@@ -105,7 +105,7 @@ awarjana-supabase/
 │   ├── pages/
 │   │   ├── dashboard/           # Role-based dashboards
 │   │   ├── orders/              # Order management
-│   │   ├── worker/              # Worker features
+│   │   ├── employer/              # Employer features
 │   │   ├── admin/               # Admin features
 │   │   └── ... (auth pages)
 │   ├── lib/
@@ -198,8 +198,8 @@ pnpm build
 - Email/Password authentication
 - Email verification
 - Password reset with OTP
-- Role-based access control (Customer, Worker, Admin)
-- Registration codes for Worker/Admin signup
+- Role-based access control (Customer, Employer, Admin)
+- Registration codes for Employer/Admin signup
 
 ### Customer Features
 - Create orders with custom dimensions
@@ -208,7 +208,7 @@ pnpm build
 - View order history
 - Submit and track drafts
 
-### Worker Features
+### Employer Features
 - View assigned job cards
 - Submit work drafts
 - Track material usage
@@ -217,7 +217,7 @@ pnpm build
 
 ### Admin Features
 - Complete order management
-- Assign orders to workers
+- Assign orders to employers
 - Review and approve drafts
 - Manage material inventory
 - Generate registration codes

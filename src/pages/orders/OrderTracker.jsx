@@ -45,7 +45,7 @@ export default function OrderTracker() {
         .select(`
           *,
           customer:users!orders_customer_id_fkey(email, profiles(full_name)),
-          worker:users!orders_assigned_worker_id_fkey(email, profiles(full_name)),
+          employer:users!orders_assigned_employer_id_fkey(email, profiles(full_name)),
           drafts(status)
         `)
         .order('created_at', { ascending: false })
@@ -53,8 +53,8 @@ export default function OrderTracker() {
       // Apply role-based filters
       if (userRole === 'customer') {
         ordersQuery = ordersQuery.eq('customer_id', user.id)
-      } else if (userRole === 'worker') {
-        ordersQuery = ordersQuery.eq('assigned_worker_id', user.id)
+      } else if (userRole === 'employer') {
+        ordersQuery = ordersQuery.eq('assigned_employer_id', user.id)
       }
       // Admin sees all orders
 

@@ -7,6 +7,8 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { ToastProvider, useToast } from './components/ui/Toast';
 import { GlobalThemeToggle } from './components/GlobalThemeToggle';
+import { BookOpen } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 // Pages
 import Login from './pages/Login';
@@ -18,7 +20,7 @@ import Unauthorized from './pages/Unauthorized';
 // Dashboard Components
 import MainDashboard from './pages/dashboard/MainDashboard';
 import CustomerDashboard from './pages/dashboard/CustomerDashboard';
-import WorkerDashboard from './pages/dashboard/WorkerDashboard';
+import EmployerDashboard from './pages/dashboard/EmployerDashboard';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 
 // Order Management
@@ -26,10 +28,10 @@ import NewOrder from './pages/orders/NewOrder';
 import OrderDetails from './pages/orders/OrderDetails';
 import OrderTracker from './pages/orders/OrderTracker';
 
-// Worker Components
-import JobCards from './pages/worker/JobCards';
-import MaterialUsage from './pages/worker/MaterialUsage';
-import SubmitDraft from './pages/worker/SubmitDraft';
+// Employer Components
+import JobCards from './pages/employer/JobCards';
+import MaterialUsage from './pages/employer/MaterialUsage';
+import SubmitDraft from './pages/employer/SubmitDraft';
 
 // Admin Components
 import InventoryManagement from './pages/admin/InventoryManagement';
@@ -40,6 +42,7 @@ import UserManagement from './pages/admin/UserManagement';
 // Profile & Settings
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+
 
 // Main Layout Component
 function MainLayout() {
@@ -60,10 +63,13 @@ function MainLayout() {
       <header className="bg-white dark:bg-dark-lighter shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-bold text-primary-500">
-                Awarjana Creations
-              </h1>
+            <div className="flex items-center space-x-6">
+              <Link to="/dashboard" className="flex items-center space-x-2">
+                <h1 className="text-xl font-bold text-primary-500">
+                  Awarjana Creations
+                </h1>
+              </Link>
+
               <span className="text-sm text-gray-600 dark:text-gray-400 hidden md:inline">
                 {userRole ? `(${userRole.charAt(0).toUpperCase() + userRole.slice(1)})` : ''}
               </span>
@@ -157,35 +163,35 @@ function AppRoutes() {
           }
         />
 
-        {/* Worker Routes */}
+        {/* Employer Routes */}
         <Route
-          path="/dashboard/worker"
+          path="/dashboard/employer"
           element={
-            <ProtectedRoute requiredRole="worker">
-              <WorkerDashboard />
+            <ProtectedRoute requiredRole="employer">
+              <EmployerDashboard />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/worker/job-cards"
+          path="/employer/job-cards"
           element={
-            <ProtectedRoute requiredRole="worker">
+            <ProtectedRoute requiredRole="employer">
               <JobCards />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/worker/material-usage"
+          path="/employer/material-usage"
           element={
-            <ProtectedRoute requiredRole="worker">
+            <ProtectedRoute requiredRole="employer">
               <MaterialUsage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/worker/drafts/submit/:orderId"
+          path="/employer/drafts/submit/:orderId"
           element={
-            <ProtectedRoute requiredRole="worker">
+            <ProtectedRoute requiredRole="employer">
               <SubmitDraft />
             </ProtectedRoute>
           }
@@ -236,6 +242,7 @@ function AppRoutes() {
         {/* Common Routes */}
         <Route path="/profile" element={<Profile />} />
         <Route path="/settings" element={<Settings />} />
+
       </Route>
 
       {/* Redirects */}

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
-  Key, Plus, Copy, CheckCircle, XCircle, Trash2, RefreshCw
+  Key, Plus, Copy, CheckCircle, XCircle, Trash2, RefreshCw, RotateCcw
 } from 'lucide-react'
 import Alert from '../../components/common/Alert'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
@@ -17,7 +17,7 @@ export default function RegistrationCodes() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
-  const [generateRole, setGenerateRole] = useState('worker')
+  const [generateRole, setGenerateRole] = useState('employer')
   const [generateCount, setGenerateCount] = useState(1)
   const [copiedCode, setCopiedCode] = useState(null)
 
@@ -74,6 +74,19 @@ export default function RegistrationCodes() {
   const handleGenerateCodes = async () => {
     try {
       setError(null)
+      
+      // Check limit
+      const { count, error: countError } = await supabase
+        .from('registration_codes')
+        .select('*', { count: 'exact', head: true })
+      
+      if (countError) throw countError
+      
+      if (count + generateCount > 10) {
+        setError(`Cannot exceed 10 total registration codes. Current: ${count}. Please delete some first.`)
+        return
+      }
+
       const newCodes = []
 
       for (let i = 0; i < generateCount; i++) {
@@ -129,6 +142,30 @@ export default function RegistrationCodes() {
     }
   }
 
+  const handleResetCodes = async () => {
+    if (!confirm('WARNING: This will delete ALL existing registration codes. Continue?')) return
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const { error: deleteError } = await supabase
+        .from('registration_codes')
+        .delete()
+        .neq('id', 0) // Delete all
+
+      if (deleteError) throw deleteError
+
+      setSuccess('All registration codes have been reset.')
+      fetchCodes()
+    } catch (err) {
+      console.error('Error resetting codes:', err)
+      setError(err.message || 'Failed to reset codes')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const copyToClipboard = (code) => {
     navigator.clipboard.writeText(code)
     setCopiedCode(code)
@@ -139,19 +176,28 @@ export default function RegistrationCodes() {
     total: codes.length,
     used: codes.filter(c => c.is_used).length,
     unused: codes.filter(c => !c.is_used).length,
-    worker: codes.filter(c => c.role === 'worker').length,
+    employer: codes.filter(c => c.role === 'employer').length,
     admin: codes.filter(c => c.role === 'admin').length
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading && codes.length === 0) return <LoadingSpinner />
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Registration Codes</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Generate and manage registration codes for workers and admins</p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Registration Codes</h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">Manage up to 10 registration codes for employers and admins</p>
+          </div>
+          <button
+            onClick={handleResetCodes}
+            className="inline-flex items-center px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 font-medium rounded-lg transition-colors"
+          >
+            <RotateCcw size={20} className="mr-2" />
+            Reset All Codes
+          </button>
         </div>
 
         {/* Alerts */}
@@ -162,7 +208,7 @@ export default function RegistrationCodes() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
           <div className="bg-white dark:bg-dark-lighter rounded-lg shadow p-6">
             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Codes</div>
-            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
+            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{stats.total}/10</div>
           </div>
           <div className="bg-white dark:bg-dark-lighter rounded-lg shadow p-6">
             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Used</div>
@@ -173,8 +219,8 @@ export default function RegistrationCodes() {
             <div className="mt-2 text-3xl font-bold text-green-600 dark:text-green-400">{stats.unused}</div>
           </div>
           <div className="bg-white dark:bg-dark-lighter rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Worker Codes</div>
-            <div className="mt-2 text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.worker}</div>
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Employer Codes</div>
+            <div className="mt-2 text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.employer}</div>
           </div>
           <div className="bg-white dark:bg-dark-lighter rounded-lg shadow p-6">
             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Admin Codes</div>
@@ -193,7 +239,8 @@ export default function RegistrationCodes() {
           </button>
           <button
             onClick={() => setShowGenerateModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg transition-colors"
+            disabled={stats.total >= 10}
+            className="inline-flex items-center px-4 py-2 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors"
           >
             <Plus size={20} className="mr-2" />
             Generate Codes
@@ -271,30 +318,25 @@ export default function RegistrationCodes() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {code.is_used ? (
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {code.used_by_user?.email || 'Unknown'}
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {code.used_at ? new Date(code.used_at).toLocaleDateString() : 'N/A'}
-                            </div>
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {code.used_by_user?.email || '-'}
+                        </div>
+                        {code.used_at && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(code.used_at).toLocaleDateString()}
                           </div>
-                        ) : (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {new Date(code.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {!code.is_used && (
-                          <button
-                            onClick={() => handleDeleteCode(code.id)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                            title="Delete code"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleDeleteCode(code.id)}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -306,54 +348,50 @@ export default function RegistrationCodes() {
 
         {/* Generate Modal */}
         {showGenerateModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-dark-lighter rounded-lg max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Generate Registration Codes</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Role *
-                  </label>
-                  <select
-                    value={generateRole}
-                    onChange={(e) => setGenerateRole(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  >
-                    <option value="worker">Worker</option>
-                    <option value="admin">Admin</option>
-                  </select>
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div className="absolute inset-0 bg-gray-500 dark:bg-black opacity-75"></div>
+              </div>
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <div className="inline-block align-bottom bg-white dark:bg-dark-lighter rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div className="bg-white dark:bg-dark-lighter px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Generate Registration Codes</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+                      <select
+                        value={generateRole}
+                        onChange={(e) => setGenerateRole(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white"
+                      >
+                        <option value="employer">Employer</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Count (Max {10 - stats.total})</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={10 - stats.total}
+                        value={generateCount}
+                        onChange={(e) => setGenerateCount(parseInt(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Number of Codes *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={generateCount}
-                    onChange={(e) => setGenerateCount(parseInt(e.target.value) || 1)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Maximum 50 codes at a time
-                  </p>
-                </div>
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                    <strong>Important:</strong> The generated codes will only be shown once. Make sure to save them securely!
-                  </p>
-                </div>
-                <div className="flex gap-3 pt-4">
+                <div className="bg-gray-50 dark:bg-dark-light px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button
                     onClick={handleGenerateCodes}
-                    className="flex-1 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg transition-colors"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-500 text-base font-medium text-white hover:bg-primary-600 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     Generate
                   </button>
                   <button
                     onClick={() => setShowGenerateModal(false)}
-                    className="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-white font-medium rounded-lg transition-colors"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-dark text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     Cancel
                   </button>

@@ -38,7 +38,7 @@ export default function MainDashboard() {
       // Define which roles can access which dashboards
       const roleAccess = {
         'customer': ['customer'],
-        'worker': ['worker'],
+        'employer': ['employer'],
         'admin': ['admin']
       }
 
@@ -81,17 +81,17 @@ export default function MainDashboard() {
           }
         )
         .subscribe()
-    } else if (userRole === 'worker') {
+    } else if (userRole === 'employer') {
       // Subscribe to job card updates
       const jobCardsChannel = supabase
-        .channel('worker-jobcards')
+        .channel('employer-jobcards')
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
             table: 'job_cards',
-            filter: `worker_id=eq.${user.id}`
+            filter: `employer_id=eq.${user.id}`
           },
           (payload) => {
             console.log('Job card update received:', payload)

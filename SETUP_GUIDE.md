@@ -208,7 +208,7 @@ src/
 ├── pages/
 │   ├── dashboard/
 │   ├── orders/
-│   ├── worker/
+│   ├── employer/
 │   └── admin/
 └── App.jsx
 ```
@@ -258,8 +258,8 @@ The database includes comprehensive Row Level Security policies:
 - **Credits**: Users can view their own; Admins can view all
 - **Credit Usage**: Users can view their own; Admins can view all
 - **Materials**: Anyone can view; Only admins can modify
-- **Orders**: Role-based access (Customer → own, Worker → assigned, Admin → all)
-- **Job Cards/Drafts**: Workers → own; Admins → all
+- **Orders**: Role-based access (Customer → own, Employer → assigned, Admin → all)
+- **Job Cards/Drafts**: Employers → own; Admins → all
 - **Registration Codes**: Verification → public; Management → admin only
 
 ---

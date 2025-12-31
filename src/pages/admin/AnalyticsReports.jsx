@@ -32,7 +32,7 @@ export default function AnalyticsReports() {
     users: {
       total: 0,
       customers: 0,
-      workers: 0,
+      employers: 0,
       admins: 0,
       newThisMonth: 0
     },
@@ -161,7 +161,7 @@ export default function AnalyticsReports() {
         users: {
           total: users?.length || 0,
           customers: users?.filter(u => u.role === 'customer').length || 0,
-          workers: users?.filter(u => u.role === 'worker').length || 0,
+          employers: users?.filter(u => u.role === 'employer').length || 0,
           admins: users?.filter(u => u.role === 'admin').length || 0,
           newThisMonth: users?.filter(u => new Date(u.created_at) >= thisMonthStart).length || 0
         },
@@ -334,8 +334,8 @@ export default function AnalyticsReports() {
                 <span className="text-xl font-semibold text-blue-600 dark:text-blue-400">{analytics.users.customers}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">Workers</span>
-                <span className="text-xl font-semibold text-green-600 dark:text-green-400">{analytics.users.workers}</span>
+                <span className="text-gray-600 dark:text-gray-400">Employers</span>
+                <span className="text-xl font-semibold text-green-600 dark:text-green-400">{analytics.users.employers}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600 dark:text-gray-400">Admins</span>

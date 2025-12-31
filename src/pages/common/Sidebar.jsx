@@ -1,9 +1,11 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { LogOut, Settings, User } from 'lucide-react';
+import { LogOut, Settings, User, BookOpen } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Sidebar = ({ title, tabs, activeTab, onTabChange, user }) => {
   const { logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <div className="w-64 bg-gray-900 dark:bg-black text-white min-h-screen border-r border-gray-800 dark:border-dark-border">
@@ -16,6 +18,7 @@ const Sidebar = ({ title, tabs, activeTab, onTabChange, user }) => {
       </div>
 
       <nav className="mt-6">
+
         {tabs.map(tab => (
           <button
             key={tab.id}

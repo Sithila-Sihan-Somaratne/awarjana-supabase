@@ -37,7 +37,7 @@ export default function MaterialUsage() {
       setLoading(true)
       setError(null)
       
-      // 1. Fetch worker's job cards - Broader status filter to ensure visibility
+      // 1. Fetch employer's job cards - Broader status filter to ensure visibility
       const { data: jobCardsData, error: jobError } = await supabase
         .from('job_cards')
         .select(`
@@ -46,7 +46,7 @@ export default function MaterialUsage() {
           status,
           order:orders(id, order_number, title)
         `)
-        .eq('worker_id', user.id)
+        .eq('employer_id', user.id)
         .order('created_at', { ascending: false })
 
       if (jobError) throw jobError
@@ -74,7 +74,7 @@ export default function MaterialUsage() {
           quantity_used,
           order:orders(order_number)
         `)
-        .eq('worker_id', user.id)
+        .eq('employer_id', user.id)
         .limit(10)
 
       setJobCards(jobCardsData || [])
@@ -118,7 +118,7 @@ export default function MaterialUsage() {
           job_card_id: formData.job_card_id,
           material_id: material.id, 
           order_id: material.order_id,
-          worker_id: user.id,
+          employer_id: user.id,
           quantity_used: parseFloat(formData.quantity_used),
           notes: formData.notes.trim() || null
         })

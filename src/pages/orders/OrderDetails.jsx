@@ -27,7 +27,7 @@ export default function OrderDetails() {
         .select(`
           *,
           customer:profiles!orders_customer_id_fkey(id, full_name, avatar_url),
-          worker:profiles!orders_assigned_worker_id_fkey(id, full_name, avatar_url)
+          employer:profiles!orders_assigned_employer_id_fkey(id, full_name, avatar_url)
         `)
         .eq('id', id)
         .single()
@@ -95,10 +95,10 @@ export default function OrderDetails() {
             <p className="dark:text-white">{order.customer?.full_name || 'System User'}</p>
           </div>
           
-          {order.worker && (
+          {order.employer && (
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-              <h3 className="font-bold mb-4 dark:text-white flex items-center"><Users className="mr-2 h-5 w-5"/> Assigned Worker</h3>
-              <p className="dark:text-white">{order.worker?.full_name}</p>
+              <h3 className="font-bold mb-4 dark:text-white flex items-center"><Users className="mr-2 h-5 w-5"/> Assigned Employer</h3>
+              <p className="dark:text-white">{order.employer?.full_name}</p>
             </div>
           )}
         </div>

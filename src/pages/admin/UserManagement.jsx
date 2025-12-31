@@ -147,7 +147,7 @@ export default function UserManagement() {
   const stats = {
     total: users.length,
     customers: users.filter(u => u.role === 'customer').length,
-    workers: users.filter(u => u.role === 'worker').length,
+    employers: users.filter(u => u.role === 'employer').length,
     admins: users.filter(u => u.role === 'admin').length,
     verified: users.filter(u => u.email_verified).length,
     unverified: users.filter(u => !u.email_verified).length
@@ -179,8 +179,8 @@ export default function UserManagement() {
             <div className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.customers}</div>
           </div>
           <div className="bg-white dark:bg-dark-lighter rounded-lg shadow p-4">
-            <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Workers</div>
-            <div className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">{stats.workers}</div>
+            <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Employers</div>
+            <div className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">{stats.employers}</div>
           </div>
           <div className="bg-white dark:bg-dark-lighter rounded-lg shadow p-4">
             <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Admins</div>
@@ -220,7 +220,7 @@ export default function UserManagement() {
             >
               <option value="all">All Roles</option>
               <option value="customer">Customer</option>
-              <option value="worker">Worker</option>
+              <option value="employer">Employer</option>
               <option value="admin">Admin</option>
             </select>
             <select
@@ -288,7 +288,7 @@ export default function UserManagement() {
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                           u.role === 'admin' 
                             ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
-                            : u.role === 'worker'
+                            : u.role === 'employer'
                             ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                             : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
                         }`}>
@@ -369,7 +369,7 @@ export default function UserManagement() {
                     required
                   >
                     <option value="customer">Customer</option>
-                    <option value="worker">Worker</option>
+                    <option value="employer">Employer</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>

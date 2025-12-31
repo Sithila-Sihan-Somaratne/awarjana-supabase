@@ -66,7 +66,7 @@ const OrderCard = ({ order, jobCardId, status, onView, onAction, userRole }) => 
           Details
         </button>
 {/* START WORK BUTTON */}
-        {userRole === 'worker' && currentStatus === 'assigned' && (
+        {userRole === 'employer' && currentStatus === 'assigned' && (
           <button 
             onClick={() => onAction && onAction(jobCardId, 'in_progress')}
             className="flex-[2] py-3 bg-blue-600 text-white rounded-xl font-black text-sm shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
@@ -76,7 +76,7 @@ const OrderCard = ({ order, jobCardId, status, onView, onAction, userRole }) => 
         )}
         
         {/* MARK FINISHED BUTTON */}
-        {userRole === 'worker' && currentStatus === 'in_progress' && (
+        {userRole === 'employer' && currentStatus === 'in_progress' && (
           <button 
             onClick={() => onAction && onAction(jobCardId, 'completed')}
             className="flex-[2] py-3 bg-green-600 text-white rounded-xl font-black text-sm shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"

@@ -3,7 +3,7 @@ import { CheckCircle, Circle, Clock } from 'lucide-react'
 function StatusTimeline({ statuses = [], currentStatus }) {
   const defaultStatuses = [
     { key: 'pending', label: 'Order Placed', description: 'Order received and pending review' },
-    { key: 'assigned', label: 'Assigned to Worker', description: 'Order assigned to a worker' },
+    { key: 'assigned', label: 'Assigned to Employer', description: 'Order assigned to a employer' },
     { key: 'in_progress', label: 'In Progress', description: 'Work is being done' },
     { key: 'draft_submitted', label: 'Draft Submitted', description: 'Draft submitted for review' },
     { key: 'completed', label: 'Completed', description: 'Order completed successfully' }

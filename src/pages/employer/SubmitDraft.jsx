@@ -1,4 +1,4 @@
-// src/pages/worker/SubmitDraft.jsx
+// src/pages/employer/SubmitDraft.jsx
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -52,12 +52,12 @@ export default function SubmitDraft() {
 
       if (orderError) throw orderError
 
-      // Verify worker is assigned to this order via job card
+      // Verify employer is assigned to this order via job card
       const { data: jobCardData } = await supabase
         .from('job_cards')
         .select('*')
         .eq('order_id', orderId)
-        .eq('worker_id', user.id)
+        .eq('employer_id', user.id)
         .single()
 
       if (!jobCardData) {
@@ -69,7 +69,7 @@ export default function SubmitDraft() {
         .from('drafts')
         .select('*')
         .eq('order_id', orderId)
-        .eq('worker_id', user.id)
+        .eq('employer_id', user.id)
         .order('submitted_at', { ascending: false })
 
       if (existingDrafts && existingDrafts.length > 0) {
@@ -238,7 +238,7 @@ export default function SubmitDraft() {
         .insert({
           order_id: orderId,
           job_card_id: jobCard?.id,
-          worker_id: user.id,
+          employer_id: user.id,
           title: formData.title,
           description: formData.description,
           notes: formData.notes,

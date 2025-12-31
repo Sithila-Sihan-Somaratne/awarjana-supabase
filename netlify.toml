@@ -134,7 +134,7 @@
   status = 200
 
 [[redirects]]
-  from = "/worker/*"
+  from = "/employer/*"
   to = "/index.html"
   status = 200
 

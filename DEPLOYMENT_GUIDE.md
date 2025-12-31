@@ -12,7 +12,7 @@ Before deploying, ensure you've completed:
 - [x] Environment variables configured locally (`.env` file)
 - [x] Application tested locally (`pnpm dev`)
 - [x] At least one test user created
-- [x] Registration codes generated (for worker/admin signup)
+- [x] Registration codes generated (for employer/admin signup)
 
 ---
 
@@ -298,7 +298,7 @@ Your application is now live!
 
 **Next Steps**:
 1. Share the URL with your team
-2. Create admin and worker accounts
+2. Create admin and employer accounts
 3. Start processing orders
 4. Monitor for any issues
 5. Iterate and improve!

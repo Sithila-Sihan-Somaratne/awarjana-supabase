@@ -81,7 +81,7 @@ git push origin main
 - [ ] Search and filter materials
 
 - [ ] Access Registration Codes
-- [ ] Generate worker codes
+- [ ] Generate employer codes
 - [ ] Generate admin codes
 - [ ] View code statistics
 - [ ] Delete unused code
@@ -104,8 +104,8 @@ git push origin main
 - [ ] View order details
 - [ ] Track order status
 
-### Worker Flow
-- [ ] Login as worker
+### Employer Flow
+- [ ] Login as employer
 - [ ] View job cards
 - [ ] Submit draft
 - [ ] Track material usage

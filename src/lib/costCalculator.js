@@ -2,11 +2,11 @@
 export const MATERIAL_PRICES = {
   GLASS_PER_SQ_INCH: 1350.0 / (48 * 36), 
   MDF_PER_SQ_INCH: 1380.0 / (96 * 48),
-  FIXED_SUPPLIES: 90.0, // Stand (50) + Hook (10) + Pins (30)
-  LABOR_BASE: 150.0,    // Wages (100) + Electricity (50)
+  FIXED_SUPPLIES: 50.0 + 10.0 + 20.0 + 10.0, // Stand (50) + Hook (10) + Under Pin (20) + Side Pin (10)
+  LABOR_BASE: 100.0 + 50.0,    // Wages (100) + Electricity (50)
 };
 
-export const calculateOrderCost = (width, height, frameBasePrice = 700.0) => {
+export const calculateOrderCost = (width, height, frameBasePrice = 518.52) => {
   if (!width || !height || width <= 0 || height <= 0) {
     return { total: 0, breakdown: { frame: 0, glass: 0, mdf: 0, labor: 0 } };
   }

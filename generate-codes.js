@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * Simple Registration Code Generator
- * Generates secure registration codes for workers and admins
+ * Generates secure registration codes for employers and admins
  * 
  * Usage:
- *   node generate-codes.js worker 5
+ *   node generate-codes.js employer 5
  *   node generate-codes.js admin 2
  */
 
@@ -28,11 +28,11 @@ function generateCode(length = 12) {
 // Main function
 async function main() {
   const args = process.argv.slice(2);
-  const role = args[0] || 'worker';
+  const role = args[0] || 'employer';
   const count = parseInt(args[1]) || 1;
 
-  if (!['worker', 'admin'].includes(role)) {
-    console.error('❌ Error: Role must be "worker" or "admin"');
+  if (!['employer', 'admin'].includes(role)) {
+    console.error('❌ Error: Role must be "employer" or "admin"');
     process.exit(1);
   }
 

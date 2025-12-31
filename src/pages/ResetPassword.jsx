@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Alert from '../components/common/Alert';
-import { Lock, Loader, Check, X, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Lock, Loader, Check, X, ShieldCheck, Eye, EyeOff, Mail, Phone } from 'lucide-react';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -14,6 +14,7 @@ export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
+  const [verificationMethod, setVerificationMethod] = useState('email');
 
   const requirements = [
     { label: '8+ characters', test: (p) => p.length >= 8 },
@@ -32,9 +33,13 @@ export default function ResetPassword() {
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'recovery' });
+    const { error } = await supabase.auth.verifyOtp({ 
+      email, 
+      token: otp, 
+      type: verificationMethod === 'email' ? 'recovery' : 'sms' 
+    });
     if (error) {
-      setAlertMessage({ type: 'error', message: 'Invalid 8-digit code.' });
+      setAlertMessage({ type: 'error', message: 'Invalid verification code.' });
     } else {
       setIsVerified(true);
       setAlertMessage({ type: 'success', message: 'Identity verified. Set your new password.' });
@@ -73,17 +78,36 @@ export default function ResetPassword() {
         {alertMessage && <Alert type={alertMessage.type} message={alertMessage.message} />}
 
         {!isVerified ? (
-          <form onSubmit={handleVerifyOTP} className="space-y-6">
-            <input
-              type="text" value={otp} maxLength={8}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              className="w-full py-4 text-center text-3xl font-mono tracking-[0.3em] border-2 rounded-2xl dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:border-blue-500 outline-none"
-              placeholder="00000000" required
-            />
-            <button disabled={loading} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all">
-              {loading ? <Loader className="animate-spin mx-auto" /> : 'Verify Identity'}
-            </button>
-          </form>
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setVerificationMethod('email')}
+                className={`flex items-center justify-center gap-2 py-2 px-4 rounded-xl border ${verificationMethod === 'email' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}
+              >
+                <Mail size={18} /> Email
+              </button>
+              <button
+                type="button"
+                onClick={() => setVerificationMethod('sms')}
+                className={`flex items-center justify-center gap-2 py-2 px-4 rounded-xl border ${verificationMethod === 'sms' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}
+              >
+                <Phone size={18} /> SMS
+              </button>
+            </div>
+
+            <form onSubmit={handleVerifyOTP} className="space-y-6">
+              <input
+                type="text" value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                className="w-full py-4 text-center text-3xl font-mono tracking-[0.3em] border-2 rounded-2xl dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:border-blue-500 outline-none"
+                placeholder="000000" required
+              />
+              <button disabled={loading} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all">
+                {loading ? <Loader className="animate-spin mx-auto" /> : 'Verify Identity'}
+              </button>
+            </form>
+          </div>
         ) : (
           <form onSubmit={handleFinalReset} className="space-y-4">
             <div className="relative">

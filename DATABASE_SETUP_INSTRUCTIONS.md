@@ -42,7 +42,7 @@
 
 ---
 
-## 🔐 Generate Registration Codes (For Worker/Admin Signup)
+## 🔐 Generate Registration Codes (For Employer/Admin Signup)
 
 ### Option 1: Using the Script (Recommended)
 
@@ -61,7 +61,7 @@
 2. Click **Insert** → **Insert row**
 3. Fill in:
    - `code`: (generate a SHA-256 hash of your desired code)
-   - `role`: `admin` or `worker`
+   - `role`: `admin` or `employer`
    - `is_used`: `false`
 4. Click **Save**
 
@@ -76,7 +76,7 @@ Before testing the app, verify:
 - [ ] All 7 tables exist in Table Editor
 - [ ] RLS is enabled on all tables (check Policies)
 - [ ] Sample materials are inserted (check `materials` table)
-- [ ] At least one registration code exists (for testing admin/worker signup)
+- [ ] At least one registration code exists (for testing admin/employer signup)
 - [ ] Database trigger `on_auth_user_created` exists (check Functions)
 
 ---
@@ -158,30 +158,30 @@ Before testing the app, verify:
 
 1. **users** - User profiles and roles
    - Links to `auth.users` (Supabase Auth)
-   - Stores role: customer, worker, admin
+   - Stores role: customer, employer, admin
 
 2. **materials** - Available materials for orders
    - Pre-populated with sample data
    - Admins can add/edit
 
 3. **orders** - Customer orders
-   - Links to customer and assigned worker
+   - Links to customer and assigned employer
    - Tracks status and deadlines
 
 4. **order_materials** - Materials used in each order
    - Junction table for orders ↔ materials
 
-5. **job_cards** - Worker assignments
-   - Links orders to workers
+5. **job_cards** - Employer assignments
+   - Links orders to employers
    - Tracks work progress
 
 6. **drafts** - Work submissions
-   - Workers submit drafts for review
+   - Employers submit drafts for review
    - Admins approve/reject
 
 7. **registration_codes** - Secure signup codes
    - SHA-256 hashed codes
-   - One-time use for workers/admins
+   - One-time use for employers/admins
 
 ---
 
@@ -192,7 +192,7 @@ Before testing the app, verify:
 All tables have RLS enabled with policies:
 
 - **Customers** can only see their own orders
-- **Workers** can only see assigned orders
+- **Employers** can only see assigned orders
 - **Admins** can see everything
 - **Users** can only edit their own profile
 
@@ -212,7 +212,7 @@ When a user signs up via Supabase Auth:
 2. ✅ Test customer signup and login
 3. ✅ Generate admin registration code
 4. ✅ Test admin signup with code
-5. ✅ Test worker signup with code
+5. ✅ Test employer signup with code
 6. 🚀 Start using the application!
 
 ---

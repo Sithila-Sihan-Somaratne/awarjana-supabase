@@ -22,7 +22,7 @@ export default function JobCards() {
       const { data, error } = await supabase
         .from('job_cards')
         .select(`*, order:orders(*, customer:users(profiles(full_name)))`)
-        .eq('worker_id', user.id)
+        .eq('employer_id', user.id)
       if (error) throw error
       setJobCards(data || [])
     } catch (err) {
@@ -82,7 +82,7 @@ export default function JobCards() {
               jobCardId={jc.id}
               order={jc.order}
               status={jc.status} // Passes the job_card status, not the order status
-              userRole="worker"
+              userRole="employer"
               onAction={handleAction}
               onView={(order) => navigate(`/orders/${order.id}`)}
             />

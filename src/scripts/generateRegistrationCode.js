@@ -38,4 +38,4 @@ async function generateRegistrationCode(role, count = 1) {
 
 // Example usage
 // generateRegistrationCode('admin', 5);
-// generateRegistrationCode('worker', 10);
+// generateRegistrationCode('employer', 10);

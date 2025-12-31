@@ -237,7 +237,7 @@ export const sendWelcomeEmail = async (email, role) => {
             <ul style="padding-left: 20px;">
               <li>Explore our dashboard to see your credits and usage</li>
               <li>Create your first order if you're a customer</li>
-              <li>Check available job cards if you're a worker</li>
+              <li>Check available job cards if you're a employer</li>
               <li>Manage your API keys in Settings</li>
             </ul>
           </div>
