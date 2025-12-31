@@ -2,7 +2,7 @@
 
 A modern, production-ready web application for managing photoframe orders, inventory, and production workflow. Built with **React**, **Supabase**, and **Tailwind CSS** with **shadcn/ui** components.
 
-## 🚀 Features
+## 🚀 Features (ongoing!)
 
 ### 🔐 Authentication
 - **Supabase Auth** - Email/Password authentication
@@ -10,6 +10,8 @@ A modern, production-ready web application for managing photoframe orders, inven
 - **Role-based access control** - Customer, Worker, Admin roles
 - **Registration codes** - Secure Worker and Admin signup
 - **Password reset** - Forgot password flow with OTP
+- **SMS through phone** - For verification, when registeing and resetting password, in case user doesn't select email.
+- **Session tracker** - To make sure it doesn't make the system crash.
 
 ### 👥 Customer Features
 - Place new orders with custom frame dimensions
@@ -82,7 +84,7 @@ A modern, production-ready web application for managing photoframe orders, inven
 
    The application will open at `http://localhost:5173`
 
-## 📁 Project Structure
+## 📁 Project Structure (To be updated!)
 
 ```
 awarjana-supabase/
