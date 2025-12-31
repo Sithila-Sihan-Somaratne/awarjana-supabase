@@ -3,47 +3,33 @@ import { supabase } from '../../lib/supabase';
 import { 
   Package, Users, BadgeDollarSign, RefreshCcw, 
   ShieldCheck, TrendingUp, AlertCircle, Clock, 
-  UserPlus, CheckCircle 
+  UserPlus, CheckCircle, TicketPlus, Hash
 } from 'lucide-react';
 import StatsCard from '../../components/common/StatsCard';
 import Alert from '../../components/common/Alert';
 
 export default function AdminDashboard() {
   const [data, setData] = useState({ 
-    orders: [], 
-    workers: [], 
+    orders: [], workers: [], codes: [],
     stats: { totalValue: 0, orderCount: 0, workerCount: 0, pendingCount: 0 } 
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [assigningId, setAssigningId] = useState(null); // Track which order is being updated
+  const [assigningId, setAssigningId] = useState(null);
 
   const fetchGlobalData = async () => {
     try {
       setLoading(true);
-      setError(null);
-
-      // 1. Fetch all orders
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (ordersError) throw ordersError;
-
-      // 2. Fetch all workers (Staff)
-      const { data: workers, error: workersError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('role', 'worker');
-
-      if (workersError) throw workersError;
+      const { data: orders } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+      const { data: workers } = await supabase.from('users').select('*').eq('role', 'worker');
+      const { data: codes } = await supabase.from('registration_codes').select('*').order('created_at', { ascending: false });
 
       const totalLKR = orders?.reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0) || 0;
 
       setData({
         orders: orders || [],
         workers: workers || [],
+        codes: codes || [],
         stats: {
           orderCount: orders?.length || 0,
           workerCount: workers?.length || 0,
@@ -58,149 +44,137 @@ export default function AdminDashboard() {
     }
   };
 
-  // NEW: Function to assign a worker to an order
+  const generateNewCode = async () => {
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    try {
+      const { error } = await supabase.from('registration_codes').insert([{ code: newCode, used: false }]);
+      if (error) throw error;
+      fetchGlobalData();
+    } catch (err) {
+      setError("Code Gen Failed: " + err.message);
+    }
+  };
+
   const handleAssignWorker = async (orderId, workerId) => {
     if (!workerId) return;
     setAssigningId(orderId);
-    
     try {
-      const { error } = await supabase
+      // 1. Create the Job Card (This makes it appear on the Worker's Dashboard)
+      const { error: jobError } = await supabase
+        .from('job_cards')
+        .insert([{ 
+          order_id: orderId, 
+          worker_id: workerId, 
+          status: 'assigned' 
+        }]);
+
+      if (jobError) throw jobError;
+
+      // 2. Update the Order status so it moves out of "Pending"
+      const { error: orderError } = await supabase
         .from('orders')
-        .update({ 
-          assigned_worker_id: workerId,
-          status: 'assigned' // Moves the order from 'pending' to 'assigned'
-        })
+        .update({ status: 'assigned' })
         .eq('id', orderId);
 
-      if (error) throw error;
-      
-      // Refresh data to show changes
+      if (orderError) throw orderError;
+
+      // 3. Refresh the data to update the UI
       await fetchGlobalData();
+      
     } catch (err) {
-      setError("Failed to assign worker: " + err.message);
+      console.error("Full Assignment Error:", err);
+      setError("Assignment Failed: " + err.message);
     } finally {
       setAssigningId(null);
     }
   };
 
-  useEffect(() => {
-    fetchGlobalData();
-  }, []);
+  useEffect(() => { fetchGlobalData(); }, []);
 
   if (loading && !data.orders.length) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8 transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl">
-              <ShieldCheck size={32} />
-            </div>
+            <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl"><ShieldCheck size={32} /></div>
             <div>
-              <h1 className="text-3xl font-black dark:text-white">Admin Control Panel</h1>
-              <p className="text-gray-500 font-medium">Global Workshop Oversight</p>
+              <h1 className="text-3xl font-black dark:text-white">Admin Control</h1>
+              <p className="text-gray-500 font-medium">Workshop Management</p>
             </div>
           </div>
-          <button 
-            onClick={fetchGlobalData}
-            className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-gray-800 dark:text-white rounded-xl shadow-sm hover:shadow-md transition-all border dark:border-gray-700 font-bold"
-          >
-            <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
-            Sync Workshop
-          </button>
+          <div className="flex gap-2">
+            <button onClick={generateNewCode} className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl shadow-lg hover:bg-indigo-700 font-bold transition-all">
+              <TicketPlus size={18} /> Generate Reg-Code
+            </button>
+            <button onClick={fetchGlobalData} className="p-3 bg-white dark:bg-gray-800 dark:text-white rounded-xl border dark:border-gray-700 shadow-sm">
+              <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         {error && <Alert type="error" message={error} className="mb-6" />}
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <StatsCard title="Total Orders" value={data.stats.orderCount} icon={Package} color="blue" />
-          <StatsCard title="Needs Assignment" value={data.stats.pendingCount} icon={Clock} color="amber" />
+          <StatsCard title="Needs Staff" value={data.stats.pendingCount} icon={Clock} color="amber" />
           <StatsCard title="Workshop Staff" value={data.stats.workerCount} icon={Users} color="green" />
-          <StatsCard title="Total Revenue" value={`Rs. ${data.stats.totalValue.toLocaleString()}`} icon={BadgeDollarSign} color="indigo" />
+          <StatsCard title="Active Codes" value={data.codes.filter(c => !c.used).length} icon={Hash} color="indigo" />
         </div>
 
-        {/* Recent Activity Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-6 md:p-10 border dark:border-gray-700 shadow-sm transition-all">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-black dark:text-white">Active Order Stream</h2>
-            <div className="flex items-center gap-2 text-blue-500 font-bold text-sm uppercase tracking-wider">
-              <TrendingUp size={20} /> Live Updates
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {data.orders.map((order) => (
-              <div 
-                key={order.id} 
-                className={`flex flex-col lg:flex-row justify-between items-start lg:items-center p-6 rounded-3xl border transition-all group ${
-                  order.status === 'pending' ? 'bg-amber-50/50 border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/30' : 'bg-gray-50 dark:bg-gray-700/30 border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-4 mb-4 lg:mb-0">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm font-black ${
-                    order.status === 'pending' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-gray-600 text-blue-600'
-                  }`}>
-                    #{order.order_number.slice(-3)}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-black text-lg dark:text-white">{order.order_number}</p>
-                      {order.status === 'pending' && (
-                        <span className="animate-pulse bg-amber-500 w-2 h-2 rounded-full" />
-                      )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Order Stream */}
+          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-[2.5rem] p-6 border dark:border-gray-700 shadow-sm">
+            <h2 className="text-xl font-black dark:text-white mb-6">Active Order Stream</h2>
+            <div className="space-y-4">
+              {data.orders.map((order) => (
+                <div key={order.id} className="flex flex-col sm:flex-row justify-between items-center p-4 rounded-2xl border dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">#{order.order_number.slice(-3)}</div>
+                    <div>
+                      <p className="font-bold dark:text-white">{order.order_number}</p>
+                      <p className="text-xs text-gray-500">{order.status.toUpperCase()}</p>
                     </div>
-                    <p className="text-sm text-gray-500 font-medium truncate max-w-[200px]">{order.title} • <span className="text-blue-500">{order.dimensions}</span></p>
                   </div>
-                </div>
-                
-                <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-                  {/* ASSIGNMENT UI */}
-                  {order.status === 'pending' ? (
-                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded-2xl border dark:border-gray-700 flex-grow lg:flex-grow-0">
-                      <UserPlus size={16} className="text-gray-400 ml-2" />
+                  <div className="mt-4 sm:mt-0">
+                    {order.status === 'pending' ? (
                       <select 
                         disabled={assigningId === order.id}
                         onChange={(e) => handleAssignWorker(order.id, e.target.value)}
-                        className="bg-transparent text-sm font-bold dark:text-white outline-none pr-4 min-w-[150px] disabled:opacity-50"
+                        className="text-sm border rounded-lg p-2 dark:bg-gray-800 dark:text-white outline-none"
                       >
-                        <option value="">Assign to Staff...</option>
-                        {data.workers.map(w => (
-                          <option key={w.id} value={w.id}>{w.email.split('@')[0].toUpperCase()}</option>
-                        ))}
+                        <option value="">Assign Staff...</option>
+                        {data.workers.map(w => <option key={w.id} value={w.id}>{w.email.split('@')[0]}</option>)}
                       </select>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 rounded-xl border border-green-100 dark:border-green-900/30">
-                      <CheckCircle size={14} />
-                      <span className="text-[10px] font-black uppercase">Assigned to Staff</span>
-                    </div>
-                  )}
-
-                  <div className="text-right ml-auto lg:ml-0">
-                    <p className="font-mono font-bold text-blue-600 dark:text-blue-400">
-                      Rs. {order.total_amount?.toLocaleString()}
-                    </p>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-tighter">Valuation</p>
+                    ) : (
+                      <div className="flex items-center gap-2 text-green-600 font-bold text-xs"><CheckCircle size={14}/> ASSIGNED</div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
 
-            {data.orders.length === 0 && (
-              <div className="text-center py-20 bg-gray-50 dark:bg-gray-700/20 rounded-3xl border-2 border-dashed dark:border-gray-700">
-                <AlertCircle className="mx-auto text-gray-400 mb-2" size={40} />
-                <p className="text-gray-500 font-medium">No workshop records found.</p>
-              </div>
-            )}
+          {/* Registration Codes List */}
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-6 border dark:border-gray-700 shadow-sm">
+            <h2 className="text-xl font-black dark:text-white mb-6">Registration Codes</h2>
+            <div className="space-y-3 overflow-y-auto max-h-[500px] pr-2">
+              {data.codes.map(c => (
+                <div key={c.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-900 rounded-xl border dark:border-gray-700">
+                  <span className="font-mono font-black text-indigo-600">{c.code}</span>
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${c.used ? 'bg-gray-200 text-gray-500' : 'bg-green-100 text-green-700'}`}>
+                    {c.used ? 'USED' : 'AVAILABLE'}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
