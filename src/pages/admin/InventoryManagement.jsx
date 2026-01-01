@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
-  Package, Plus, Edit2, Trash2, AlertTriangle, Search, Filter
+  Package, Plus, Edit2, Trash2, AlertTriangle, Search, Filter, RefreshCw, X
 } from 'lucide-react'
 import Alert from '../../components/common/Alert'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
@@ -20,8 +20,7 @@ export default function InventoryManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editingMaterial, setEditingMaterial] = useState(null)
+  
   const [formData, setFormData] = useState({
     name: '',
     cost: '',
@@ -37,519 +36,178 @@ export default function InventoryManagement() {
       return
     }
     fetchMaterials()
-  }, [user, userRole, navigate])
+  }, [user, userRole])
 
   useEffect(() => {
-    filterMaterials()
-  }, [materials, searchTerm, filterCategory])
+    handleFilter()
+  }, [searchTerm, filterCategory, materials])
 
   const fetchMaterials = async () => {
     try {
       setLoading(true)
-      setError(null)
-
       const { data, error: fetchError } = await supabase
         .from('materials')
         .select('*')
         .order('name', { ascending: true })
 
       if (fetchError) throw fetchError
-
       setMaterials(data || [])
     } catch (err) {
-      console.error('Error fetching materials:', err)
-      setError(err.message || 'Failed to load materials')
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const filterMaterials = () => {
-    let filtered = materials
+  const handleFilter = () => {
+    let result = [...materials]
 
-    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(m =>
-        m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.category?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      result = result.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()))
     }
 
-    // Category filter
-    if (filterCategory !== 'all') {
-      if (filterCategory === 'low_stock') {
-        filtered = filtered.filter(m => (m.stock_quantity || 0) <= (m.low_stock_threshold || 0))
-      } else {
-        filtered = filtered.filter(m => m.category === filterCategory)
-      }
+    if (filterCategory === 'low_stock') {
+      // FIX: Correct low stock comparison
+      result = result.filter(m => (m.stock_quantity || 0) <= (m.low_stock_threshold || 0))
+    } else if (filterCategory !== 'all') {
+      result = result.filter(m => m.category === filterCategory)
     }
 
-    setFilteredMaterials(filtered)
+    setFilteredMaterials(result)
   }
 
-  const handleAddMaterial = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setLoading(true)
     try {
-      setError(null)
+      // FIX: Explicit Type Casting for Database Integrity
+      const submissionData = {
+        name: formData.name,
+        unit: formData.unit,
+        category: formData.category,
+        cost: parseFloat(formData.cost) || 0,
+        stock_quantity: parseInt(formData.stock_quantity) || 0,
+        low_stock_threshold: parseInt(formData.low_stock_threshold) || 0
+      }
 
-      const { error: insertError } = await supabase
-        .from('materials')
-        .insert([{
-          name: formData.name,
-          cost: parseFloat(formData.cost),
-          stock_quantity: parseInt(formData.stock_quantity),
-          low_stock_threshold: parseInt(formData.low_stock_threshold),
-          unit: formData.unit,
-          category: formData.category,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }])
-
+      const { error: insertError } = await supabase.from('materials').insert([submissionData])
       if (insertError) throw insertError
 
-      setSuccess('Material added successfully!')
+      setSuccess("Material added to 2026 inventory!")
       setShowAddModal(false)
-      resetForm()
+      setFormData({ name: '', cost: '', stock_quantity: '', low_stock_threshold: '', unit: '', category: '' })
       fetchMaterials()
     } catch (err) {
-      console.error('Error adding material:', err)
-      setError(err.message || 'Failed to add material')
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleUpdateMaterial = async (e) => {
-    e.preventDefault()
-    try {
-      setError(null)
-
-      const { error: updateError } = await supabase
-        .from('materials')
-        .update({
-          name: formData.name,
-          cost: parseFloat(formData.cost),
-          stock_quantity: parseInt(formData.stock_quantity),
-          low_stock_threshold: parseInt(formData.low_stock_threshold),
-          unit: formData.unit,
-          category: formData.category,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingMaterial.id)
-
-      if (updateError) throw updateError
-
-      setSuccess('Material updated successfully!')
-      setShowEditModal(false)
-      setEditingMaterial(null)
-      resetForm()
-      fetchMaterials()
-    } catch (err) {
-      console.error('Error updating material:', err)
-      setError(err.message || 'Failed to update material')
-    }
-  }
-
-  const handleDeleteMaterial = async (id) => {
-    if (!confirm('Are you sure you want to delete this material?')) return
-
-    try {
-      setError(null)
-
-      const { error: deleteError } = await supabase
-        .from('materials')
-        .delete()
-        .eq('id', id)
-
-      if (deleteError) throw deleteError
-
-      setSuccess('Material deleted successfully!')
-      fetchMaterials()
-    } catch (err) {
-      console.error('Error deleting material:', err)
-      setError(err.message || 'Failed to delete material')
-    }
-  }
-
-  const openEditModal = (material) => {
-    setEditingMaterial(material)
-    setFormData({
-      name: material.name,
-      cost: material.cost,
-      stock_quantity: material.stock_quantity,
-      low_stock_threshold: material.low_stock_threshold,
-      unit: material.unit || '',
-      category: material.category || ''
-    })
-    setShowEditModal(true)
-  }
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      cost: '',
-      stock_quantity: '',
-      low_stock_threshold: '',
-      unit: '',
-      category: ''
-    })
-  }
-
-  const categories = [...new Set(materials.map(m => m.category).filter(Boolean))]
-  const lowStockCount = materials.filter(m => (m.stock_quantity || 0) <= (m.low_stock_threshold || 0)).length
-
-  if (loading) return <LoadingSpinner />
+  if (loading && materials.length === 0) return <LoadingSpinner />
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-dark transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Inventory Management</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Manage materials and track stock levels</p>
-        </div>
-
-        {/* Alerts */}
-        {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
-        {success && <Alert type="success" message={success} onClose={() => setSuccess(null)} />}
-
-        {/* Low Stock Alert */}
-        {lowStockCount > 0 && (
-          <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-            <div className="flex items-center">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3" />
-              <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                <strong>{lowStockCount}</strong> material{lowStockCount > 1 ? 's' : ''} running low on stock
-              </p>
-            </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-black p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div>
+            <h1 className="text-4xl font-black dark:text-white uppercase tracking-tighter">Inventory</h1>
+            <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">Stock Control Center</p>
           </div>
-        )}
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-all"
+          >
+            <Plus size={20} /> ADD MATERIAL
+          </button>
+        </header>
 
-        {/* Controls */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
-          {/* Search */}
+        {/* Filters */}
+        <div className="bg-white dark:bg-gray-900 p-4 rounded-3xl border dark:border-gray-800 mb-6 flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search materials..."
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="text" placeholder="Search materials..." 
+              className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl dark:text-white"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark-lighter text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
-
-          {/* Filter */}
-          <div className="flex items-center gap-2">
-            <Filter size={20} className="text-gray-400" />
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark-lighter text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="all">All Categories</option>
-              <option value="low_stock">Low Stock</option>
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Add Button */}
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg transition-colors"
+          <select 
+            className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl font-bold text-xs dark:text-white outline-none"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
           >
-            <Plus size={20} className="mr-2" />
-            Add Material
-          </button>
+            <option value="all">All Categories</option>
+            <option value="low_stock">⚠️ Low Stock Only</option>
+            <option value="Raw Material">Raw Material</option>
+            <option value="Finishing">Finishing</option>
+          </select>
         </div>
 
-        {/* Materials Table */}
-        <div className="bg-white dark:bg-dark-lighter shadow-md rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-dark-light">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Material
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Cost
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Stock
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-dark-lighter divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredMaterials.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                      <Package size={48} className="mx-auto mb-4 opacity-50" />
-                      <p>No materials found</p>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredMaterials.map((material) => {
-                    const isLowStock = material.stock_quantity <= material.low_stock_threshold
-                    return (
-                      <tr key={material.id} className="hover:bg-gray-50 dark:hover:bg-dark-light transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{material.name}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{material.unit || 'N/A'}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
-                            {material.category || 'Uncategorized'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                          Rs. {parseFloat(material.cost).toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 dark:text-white">{material.stock_quantity}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Min: {material.low_stock_threshold}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {isLowStock ? (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
-                              Low Stock
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-                              In Stock
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => openEditModal(material)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-4"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteMaterial(material.id)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+        {error && <Alert type="error" message={error} onClose={() => setError(null)} className="mb-6" />}
+        {success && <Alert type="success" message={success} onClose={() => setSuccess(null)} className="mb-6" />}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredMaterials.map(m => (
+            <div key={m.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border dark:border-gray-800 shadow-sm relative overflow-hidden">
+              {m.stock_quantity <= m.low_stock_threshold && (
+                <div className="absolute top-0 right-0 bg-red-500 text-white p-2 rounded-bl-xl"><AlertTriangle size={16}/></div>
+              )}
+              <h3 className="font-black text-xl dark:text-white mb-2 uppercase tracking-tighter">{m.name}</h3>
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase">Current Stock</p>
+                  <p className={`text-3xl font-black ${m.stock_quantity <= m.low_stock_threshold ? 'text-red-500' : 'dark:text-white'}`}>
+                    {m.stock_quantity} <span className="text-sm font-medium text-gray-500">{m.unit}</span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Unit Cost</p>
+                  <p className="font-mono font-bold dark:text-gray-300">Rs. {m.cost}</p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-
-        {/* Add Material Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-dark-lighter rounded-lg max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Add New Material</h2>
-              <form onSubmit={handleAddMaterial} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Material Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Cost (Rs.) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={formData.cost}
-                    onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Stock Quantity *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.stock_quantity}
-                    onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Low Stock Threshold *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.low_stock_threshold}
-                    onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Unit
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="e.g., kg, m, pieces"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Category
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="e.g., Wood, Glass, Metal"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg transition-colors"
-                  >
-                    Add Material
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowAddModal(false); resetForm(); }}
-                    className="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-white font-medium rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Material Modal */}
-        {showEditModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-dark-lighter rounded-lg max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Edit Material</h2>
-              <form onSubmit={handleUpdateMaterial} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Material Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Cost (Rs.) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={formData.cost}
-                    onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Stock Quantity *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.stock_quantity}
-                    onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Low Stock Threshold *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.low_stock_threshold}
-                    onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Unit
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Category
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg transition-colors"
-                  >
-                    Update Material
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowEditModal(false); setEditingMaterial(null); resetForm(); }}
-                    className="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-white font-medium rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Simplified Add Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[3rem] p-8 shadow-2xl">
+            <h2 className="text-2xl font-black dark:text-white mb-6 uppercase">New Material</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input 
+                required placeholder="Material Name" 
+                className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border-none dark:text-white"
+                value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <input 
+                  required type="number" placeholder="Cost" 
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border-none dark:text-white"
+                  value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})}
+                />
+                <input 
+                  required placeholder="Unit (e.g. Kg, Mtr)" 
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border-none dark:text-white"
+                  value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})}
+                />
+              </div>
+              <input 
+                required type="number" placeholder="Initial Quantity" 
+                className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border-none dark:text-white"
+                value={formData.stock_quantity} onChange={e => setFormData({...formData, stock_quantity: e.target.value})}
+              />
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-black">SAVE</button>
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-4 bg-gray-100 rounded-xl font-black">CANCEL</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

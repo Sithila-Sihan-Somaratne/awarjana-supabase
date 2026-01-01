@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { formatErrorMessage } from "../lib/crypto";
 
@@ -10,77 +10,74 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pendingVerification, setPendingVerification] = useState(null);
+  
+  // Use a ref to prevent unnecessary re-syncs when switching tabs
+  const lastSyncedId = useRef(null);
 
-  // --- 1. DATABASE VERIFICATION (GHOST BUSTER LOGIC) ---
+  // --- 1. DATABASE VERIFICATION (GHOST BUSTER) ---
   const verifyUserExistsInDatabase = async (userId) => {
     try {
       console.log("🔍 [AuthContext] Verifying user integrity...");
       
-      // Check Public Profile Table
       const { data: publicUser, error: pErr } = await supabase
         .from("users")
         .select("id, role, email_verified")
         .eq("id", userId)
         .maybeSingle();
 
-      // Check Internal Auth Server
-      const { data: { user: authUser }, error: aErr } = await supabase.auth.getUser();
+      // If RLS loops or 500s, we don't kick the user out
+      if (pErr) {
+        console.warn("⚠️ Integrity check bypassed due to RLS/Network error:", pErr.message);
+        return { exists: true }; 
+      }
 
       return {
-        exists: !!publicUser && !!authUser,
-        userData: publicUser,
-        error: pErr || aErr
+        exists: !!publicUser,
+        userData: publicUser
       };
     } catch (err) {
       console.error("❌ Integrity check failed:", err);
-      return { exists: false };
+      return { exists: true }; 
     }
   };
 
-  // --- 2. SESSION HANDLER & TRACKER ---
+  // --- 2. SESSION HANDLER ---
   const handleUserSession = useCallback(async (authUser) => {
     if (!authUser) {
       setUser(null);
       setUserRole(null);
+      lastSyncedId.current = null;
       return;
     }
 
     setUser(authUser);
     
-    try {
-      // Immediate Role Sync from JWT
-      const jwtRole = authUser.app_metadata?.role;
-      if (jwtRole) setUserRole(jwtRole);
+    const jwtRole = authUser.app_metadata?.role;
+    if (jwtRole) setUserRole(jwtRole);
 
-      // Deep Sync from Database
+    if (lastSyncedId.current === authUser.id) return;
+
+    try {
       const { data, error: uErr } = await supabase
         .from("users")
         .select("role, email_verified")
         .eq("id", authUser.id)
         .maybeSingle();
 
-      if (uErr || !data) {
-        console.warn("⚠️ Data mismatch detected.");
-      } else {
-        setUserRole(data.role || "customer");
-        
-        // Update verification if auth server and DB are out of sync
-        const isVerified = !!authUser.email_confirmed_at;
-        if (data.email_verified !== isVerified) {
-          await supabase.from("users").update({ email_verified: isVerified }).eq("id", authUser.id);
-        }
+      if (uErr) {
+        console.warn("⚠️ Database sync skipped (RLS/Network):", uErr.message);
+        return;
       }
 
-      // Session Tracker: Log login activity
-      await supabase.from("activity_logs").insert({
-        user_id: authUser.id,
-        action_type: "login",
-        action_details: { 
-          user_agent: navigator.userAgent,
-          timestamp: new Date().toISOString()
+      if (data) {
+        setUserRole(data.role || jwtRole || "customer");
+        lastSyncedId.current = authUser.id;
+        
+        const isConfirmed = !!authUser.email_confirmed_at;
+        if (data.email_verified !== isConfirmed) {
+          await supabase.from("users").update({ email_verified: isConfirmed }).eq("id", authUser.id);
         }
-      });
-
+      }
     } catch (err) {
       console.warn("Session sync warning:", err.message);
     }
@@ -91,30 +88,37 @@ export function AuthProvider({ children }) {
     let mounted = true;
 
     const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user && mounted) {
-        const verification = await verifyUserExistsInDatabase(session.user.id);
-        if (!verification.exists) {
-          console.warn("🛑 Ghost session purged.");
-          await logout();
-        } else {
-          await handleUserSession(session.user);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user && mounted) {
+          const verification = await verifyUserExistsInDatabase(session.user.id);
+          
+          if (verification.exists === false) {
+            console.warn("🛑 Ghost session confirmed. Purging...");
+            await logout();
+          } else {
+            await handleUserSession(session.user);
+          }
         }
+      } catch (err) {
+        console.error("Auth initialization error:", err);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      if (mounted) setLoading(false);
     };
 
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 Auth Change:", event);
-      if (event === 'SIGNED_IN' && session?.user) {
+      console.log("🔄 Auth Event:", event);
+      
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') && session?.user) {
         await handleUserSession(session.user);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserRole(null);
-        setPendingVerification(null);
+        lastSyncedId.current = null;
         localStorage.clear();
       }
     });
@@ -125,12 +129,14 @@ export function AuthProvider({ children }) {
     };
   }, [handleUserSession]);
 
-  // --- 4. UTILS & HASHING ---
+  // --- 4. UTILS & HELPERS ---
   const hashString = async (str) => {
     const encoder = new TextEncoder();
     const data = encoder.encode(str);
     const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+    return Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
   };
 
   const validateRegistrationCode = async (code, role) => {
@@ -161,7 +167,7 @@ export function AuthProvider({ children }) {
       if (error) throw error;
       
       const check = await verifyUserExistsInDatabase(data.user.id);
-      if (!check.exists) throw new Error("Account records missing.");
+      if (check.exists === false) throw new Error("Database profile missing.");
       
       await handleUserSession(data.user);
       return { success: true };
@@ -171,27 +177,18 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setUserRole(null);
-    localStorage.clear();
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setUser(null);
+      setUserRole(null);
+      lastSyncedId.current = null;
+      localStorage.clear();
+    }
   };
 
   const requestSignupOTP = async (email, password, role, registrationCodeId) => {
     try {
-      // If registration code is provided, validate it first
-      if (registrationCodeId) {
-        const { data: codeData, error: codeError } = await supabase
-          .from("registration_codes")
-          .select("id, is_used")
-          .eq("id", registrationCodeId)
-          .single();
-        
-        if (codeError || !codeData || codeData.is_used) {
-          throw new Error("Registration code is invalid or already used.");
-        }
-      }
-
       const { error } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
@@ -208,7 +205,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const verifySignupOTP = async (email, token, registrationCodeId) => {
+  const verifySignupOTP = async (email, token) => {
     try {
       const { data, error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase().trim(),
@@ -218,18 +215,7 @@ export function AuthProvider({ children }) {
       if (error) throw error;
       
       if (data.user) {
-        // Update user verification status
         await supabase.from("users").update({ email_verified: true }).eq("id", data.user.id);
-        
-        // If there was a registration code, mark it as used
-        if (registrationCodeId) {
-          await supabase.from("registration_codes").update({
-            is_used: true,
-            used_by: data.user.id,
-            used_at: new Date().toISOString()
-          }).eq("id", registrationCodeId);
-        }
-        
         await handleUserSession(data.user);
       }
       return { success: true };
@@ -276,7 +262,11 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!user,
   };
 
-  return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

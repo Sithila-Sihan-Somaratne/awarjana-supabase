@@ -1,8 +1,9 @@
+// src/pages/ResetPassword.jsx
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Alert from '../components/common/Alert';
-import { Lock, Loader, Check, X, ShieldCheck, Eye, EyeOff, Mail, Phone } from 'lucide-react';
+import { Lock, Loader, Check, X, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -14,132 +15,99 @@ export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
-  const [verificationMethod, setVerificationMethod] = useState('email');
 
   const requirements = [
     { label: '8+ characters', test: (p) => p.length >= 8 },
-    { label: 'Uppercase', test: (p) => /[A-Z]/.test(p) },
-    { label: 'Lowercase', test: (p) => /[a-z]/.test(p) },
-    { label: 'Number', test: (p) => /[0-9]/.test(p) },
-    { label: 'Symbol (!@#$%^&*)', test: (p) => /[!@#$%^&*]/.test(p) },
+    { label: 'Uppercase & Lowercase', test: (p) => /[A-Z]/.test(p) && /[a-z]/.test(p) },
+    { label: 'Number or Symbol', test: (p) => /[0-9!@#$%^&*]/.test(p) },
   ];
 
   useEffect(() => {
     const stored = localStorage.getItem('reset_email');
-    if (!stored) navigate('/forgot-password');
-    else setEmail(stored);
-  }, [navigate]);
+    if (stored) setEmail(stored);
+  }, []);
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({ 
-      email, 
-      token: otp, 
-      type: verificationMethod === 'email' ? 'recovery' : 'sms' 
-    });
-    if (error) {
-      setAlertMessage({ type: 'error', message: 'Invalid verification code.' });
-    } else {
+    try {
+      const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'recovery' });
+      if (error) throw error;
       setIsVerified(true);
       setAlertMessage({ type: 'success', message: 'Identity verified. Set your new password.' });
-    }
-    setLoading(false);
+    } catch (err) {
+      setAlertMessage({ type: 'error', message: err.message });
+    } finally { setLoading(false); }
   };
 
-  const handleFinalReset = async (e) => {
+  const handleResetPassword = async (e) => {
     e.preventDefault();
-    if (password !== confirmPassword) return setAlertMessage({ type: 'error', message: 'Passwords do not match' });
-    if (!requirements.every(r => r.test(password))) return setAlertMessage({ type: 'error', message: 'Requirements not met' });
-
+    if (password !== confirmPassword) {
+      setAlertMessage({ type: 'error', message: 'Passwords do not match.' });
+      return;
+    }
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      setAlertMessage({ type: 'error', message: error.message });
-    } else {
-      setAlertMessage({ type: 'success', message: 'Password updated! Redirecting...' });
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      setAlertMessage({ type: 'success', message: 'Password updated! Redirecting to login...' });
       localStorage.removeItem('reset_email');
       setTimeout(() => navigate('/login'), 2000);
-    }
-    setLoading(false);
+    } catch (err) {
+      setAlertMessage({ type: 'error', message: err.message });
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4 transition-colors duration-300">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-[2rem] shadow-2xl border dark:border-gray-700">
+    <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-[2.5rem] p-8 shadow-xl border dark:border-gray-800">
         <div className="text-center mb-8">
-          <div className="inline-flex p-4 bg-blue-100 dark:bg-blue-900/30 rounded-full text-blue-600 mb-4">
-            <ShieldCheck size={32} />
+          <div className="inline-flex p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl text-indigo-600 mb-4">
+            <Lock size={32} />
           </div>
-          <h1 className="text-2xl font-bold dark:text-white">Secure Reset</h1>
-          <p className="text-gray-500 text-sm">{email}</p>
+          <h1 className="text-3xl font-black dark:text-white uppercase tracking-tighter">Security Reset</h1>
+          <p className="text-gray-500 font-bold text-xs mt-2 uppercase tracking-widest">Update your credentials</p>
         </div>
 
-        {alertMessage && <Alert type={alertMessage.type} message={alertMessage.message} />}
+        {alertMessage && <Alert type={alertMessage.type} message={alertMessage.message} className="mb-6" />}
 
         {!isVerified ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setVerificationMethod('email')}
-                className={`flex items-center justify-center gap-2 py-2 px-4 rounded-xl border ${verificationMethod === 'email' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}
-              >
-                <Mail size={18} /> Email
-              </button>
-              <button
-                type="button"
-                onClick={() => setVerificationMethod('sms')}
-                className={`flex items-center justify-center gap-2 py-2 px-4 rounded-xl border ${verificationMethod === 'sms' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}
-              >
-                <Phone size={18} /> SMS
-              </button>
-            </div>
-
-            <form onSubmit={handleVerifyOTP} className="space-y-6">
-              <input
-                type="text" value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                className="w-full py-4 text-center text-3xl font-mono tracking-[0.3em] border-2 rounded-2xl dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:border-blue-500 outline-none"
-                placeholder="000000" required
-              />
-              <button disabled={loading} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all">
-                {loading ? <Loader className="animate-spin mx-auto" /> : 'Verify Identity'}
-              </button>
-            </form>
-          </div>
+          <form onSubmit={handleVerifyOTP} className="space-y-4">
+            <input 
+              type="text" placeholder="8-Digit Code" maxLength={8}
+              className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl text-center text-2xl font-black tracking-[0.5em] dark:text-white"
+              value={otp} onChange={(e) => setOtp(e.target.value)} required
+            />
+            <button disabled={loading} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all flex justify-center items-center gap-2">
+              {loading ? <Loader className="animate-spin" size={20} /> : 'VERIFY CODE'}
+            </button>
+          </form>
         ) : (
-          <form onSubmit={handleFinalReset} className="space-y-4">
+          <form onSubmit={handleResetPassword} className="space-y-4">
             <div className="relative">
               <input 
-                type={showPassword ? "text" : "password"} 
-                placeholder="New Password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                className="w-full p-4 border rounded-2xl dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 outline-none" required 
+                type={showPassword ? "text" : "password"} placeholder="New Password"
+                className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl dark:text-white"
+                value={password} onChange={(e) => setPassword(e.target.value)} required
               />
               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-4 text-gray-400">
-                {showPassword ? <EyeOff size={20}/> : <Eye size={20}/>}
+                {showPassword ? <X size={20}/> : <Eye size={20}/>}
               </button>
             </div>
-            
-            <div className="grid grid-cols-2 gap-2 p-2">
+            <div className="grid grid-cols-1 gap-2 px-2">
               {requirements.map((req, i) => (
-                <div key={i} className={`flex items-center gap-2 text-[10px] ${req.test(password) ? 'text-green-500' : 'text-gray-400'}`}>
+                <div key={i} className={`flex items-center gap-2 text-[10px] font-bold uppercase ${req.test(password) ? 'text-green-500' : 'text-gray-400'}`}>
                   {req.test(password) ? <Check size={12}/> : <X size={12}/>} {req.label}
                 </div>
               ))}
             </div>
-
             <input 
-              type="password" 
-              placeholder="Confirm Password" 
-              value={confirmPassword} 
-              onChange={(e) => setConfirmPassword(e.target.value)} 
-              className="w-full p-4 border rounded-2xl dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 outline-none" required 
+              type="password" placeholder="Confirm New Password"
+              className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl dark:text-white"
+              value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required
             />
-            <button disabled={loading} className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold hover:bg-green-700 transition-all">
-              Update Password
+            <button disabled={loading} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all">
+              {loading ? <Loader className="animate-spin mx-auto" size={20} /> : 'UPDATE PASSWORD'}
             </button>
           </form>
         )}

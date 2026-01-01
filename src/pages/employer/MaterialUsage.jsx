@@ -1,9 +1,10 @@
+// src/pages/employer/MaterialUsage.jsx
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
-  ArrowLeft, Wrench, Loader, Package
+  ArrowLeft, Wrench, Loader, Package, AlertCircle, History
 } from 'lucide-react'
 import Alert from '../../components/common/Alert'
 
@@ -17,8 +18,9 @@ export default function MaterialUsage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  
   const [formData, setFormData] = useState({
-    job_card_id: '',
+    job_card_id: searchParams.get('jobCard') || '',
     material_id: '',
     quantity_used: '',
     notes: ''
@@ -37,103 +39,78 @@ export default function MaterialUsage() {
       setLoading(true)
       setError(null)
       
-      // 1. Fetch employer's job cards - Broader status filter to ensure visibility
-      const { data: jobCardsData, error: jobError } = await supabase
+      // 1. Obtener Job Cards del trabajador (solo las activas)
+      const { data: jobCardsData } = await supabase
         .from('job_cards')
-        .select(`
-          id,
-          order_id,
-          status,
-          order:orders(id, order_number, title)
-        `)
+        .select(`id, order:orders(order_number, title)`)
         .eq('employer_id', user.id)
-        .order('created_at', { ascending: false })
+        .in('status', ['pending', 'in_progress'])
 
-      if (jobError) throw jobError
+      // 2. Obtener lista de materiales y su stock actual
+      const { data: materialsData } = await supabase
+        .from('materials')
+        .select('*')
+        .order('name')
 
-      // 2. Fetch materials for these orders
-      const orderIds = jobCardsData?.map(j => j.order_id) || []
-      let materialsData = []
-      
-      if (orderIds.length > 0) {
-        const { data, error: matError } = await supabase
-          .from('order_materials')
-          .select(`*`)
-          .in('order_id', orderIds)
-          // We removed the 'allocated' requirement temporarily so you can see all materials
-          
-        if (matError) throw matError
-        materialsData = data
-      }
-
-      // 3. Fetch recent history
-      const { data: usageData } = await supabase
+      // 3. Obtener logs recientes del trabajador
+      const { data: logs } = await supabase
         .from('material_usage')
-        .select(`
-          id,
-          quantity_used,
-          order:orders(order_number)
-        `)
-        .eq('employer_id', user.id)
+        .select(`*, material:materials(name, unit), order:orders(order_number)`)
+        .order('created_at', { ascending: false })
         .limit(10)
 
       setJobCards(jobCardsData || [])
       setMaterials(materialsData || [])
-      setUsageRecords(usageData || [])
-
-      // Auto-select from URL
-      const preSelectedJob = searchParams.get('jobCard')
-      if (preSelectedJob) {
-        setFormData(prev => ({ ...prev, job_card_id: preSelectedJob }))
-      }
-
+      setUsageRecords(logs || [])
     } catch (err) {
-      console.error('Fetch Error:', err)
-      setError("Data Visibility Error: " + err.message)
+      setError("Error de carga: " + err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  // FIXED FILTER: Ensuring we match string IDs to object IDs correctly
-  const selectedJob = jobCards.find(j => String(j.id) === String(formData.job_card_id))
-  const availableMaterials = materials.filter(m => 
-    String(m.order_id) === String(selectedJob?.order_id)
-  )
-
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!formData.job_card_id || !formData.material_id || !formData.quantity_used) {
-      setError('Missing required fields')
-      return
-    }
+    setLoading(true)
+    setError(null)
+    setSuccess(null)
 
     try {
-      setLoading(true)
-      const material = materials.find(m => String(m.id) === String(formData.material_id))
+      const qty = parseFloat(formData.quantity_used)
+      const selectedMaterial = materials.find(m => m.id === formData.material_id)
 
+      // VALIDACIÓN CRÍTICA: ¿Hay suficiente stock?
+      if (!selectedMaterial) throw new Error("Selecciona un material válido.")
+      if (qty <= 0) throw new Error("La cantidad debe ser mayor a 0.")
+      if (selectedMaterial.stock_quantity < qty) {
+        throw new Error(`Stock insuficiente. Solo quedan ${selectedMaterial.stock_quantity} ${selectedMaterial.unit}`)
+      }
+
+      // 1. Registrar el uso
       const { error: usageError } = await supabase
         .from('material_usage')
-        .insert({
+        .insert([{
           job_card_id: formData.job_card_id,
-          material_id: material.id, 
-          order_id: material.order_id,
-          employer_id: user.id,
-          quantity_used: parseFloat(formData.quantity_used),
-          notes: formData.notes.trim() || null
-        })
+          material_id: formData.material_id,
+          quantity_used: qty,
+          notes: formData.notes,
+          recorded_by: user.id
+        }])
 
       if (usageError) throw usageError
 
-      // Update the status in the order_materials table
-      await supabase
-        .from('order_materials')
-        .update({ status: 'used', actual_used_quantity: parseFloat(formData.quantity_used) })
-        .eq('id', material.id)
+      // 2. Descontar del inventario (Actualización de stock)
+      const { error: stockError } = await supabase
+        .from('materials')
+        .update({ stock_quantity: selectedMaterial.stock_quantity - qty })
+        .eq('id', formData.material_id)
 
-      setSuccess('Material Logged!')
-      setFormData({ job_card_id: '', material_id: '', quantity_used: '', notes: '' })
-      fetchData()
+      if (stockError) throw stockError
+
+      setSuccess(`¡Registrado! Se han descontado ${qty} ${selectedMaterial.unit} de ${selectedMaterial.name}.`)
+      setFormData({ ...formData, quantity_used: '', notes: '' })
+      fetchData() // Refrescar stock y logs
+
     } catch (err) {
       setError(err.message)
     } finally {
@@ -141,96 +118,98 @@ export default function MaterialUsage() {
     }
   }
 
-  if (loading && jobCards.length === 0) return (
-    <div className="h-screen flex items-center justify-center bg-gray-900">
-      <Loader className="animate-spin text-orange-600" size={48} />
-    </div>
-  )
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 mb-6 hover:text-white transition-colors">
-          <ArrowLeft size={16} /> Back
+    <div className="min-h-screen bg-gray-50 dark:bg-black p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 mb-6 font-bold uppercase text-xs">
+          <ArrowLeft size={16} /> Volver
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border dark:border-gray-700 shadow-sm">
-              <h2 className="text-2xl font-black dark:text-white mb-6 flex items-center gap-2">
-                <Wrench className="text-orange-600" /> Record Usage
-              </h2>
-              
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Job Card Dropdown */}
-                <div>
-                  <label className="block text-xs font-bold uppercase text-gray-400 mb-2">Select Assigned Task</label>
-                  <select 
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 dark:text-white border dark:border-gray-700 rounded-2xl"
-                    value={formData.job_card_id}
-                    onChange={(e) => setFormData({...formData, job_card_id: e.target.value, material_id: ''})}
-                  >
-                    <option value="">Choose a job...</option>
-                    {jobCards.map(j => (
-                      <option key={j.id} value={j.id}>
-                        {j.order?.order_number} - {j.order?.title} ({j.status})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Material Dropdown */}
-                <div>
-                  <label className="block text-xs font-bold uppercase text-gray-400 mb-2">Allocated Material</label>
-                  <select 
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 dark:text-white border dark:border-gray-700 rounded-2xl disabled:opacity-30"
-                    disabled={!formData.job_card_id}
-                    value={formData.material_id}
-                    onChange={(e) => setFormData({...formData, material_id: e.target.value})}
-                  >
-                    <option value="">Select item to log...</option>
-                    {availableMaterials.map(m => (
-                      <option key={m.id} value={m.id}>{m.name} (Need: {m.required_quantity})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <input 
-                    type="number" step="0.01" placeholder="Quantity"
-                    className="p-4 bg-gray-50 dark:bg-gray-900 dark:text-white border dark:border-gray-700 rounded-2xl"
-                    value={formData.quantity_used}
-                    onChange={(e) => setFormData({...formData, quantity_used: e.target.value})}
-                  />
-                  <input 
-                    type="text" placeholder="Notes (Optional)"
-                    className="p-4 bg-gray-50 dark:bg-gray-900 dark:text-white border dark:border-gray-700 rounded-2xl"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  />
-                </div>
-
-                <button 
-                  type="submit" 
-                  disabled={loading}
-                  className="w-full py-4 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all disabled:opacity-50"
-                >
-                  {loading ? 'Saving...' : 'Confirm Usage'}
-                </button>
-              </form>
-              
-              {success && <Alert type="success" message={success} className="mt-4" />}
-              {error && <Alert type="error" message={error} className="mt-4" />}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Formulario */}
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border dark:border-gray-700">
+            <div className="flex items-center gap-3 mb-6 text-orange-600">
+              <Wrench size={24} />
+              <h2 className="text-2xl font-black uppercase tracking-tighter">Consumo de Material</h2>
             </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-black text-gray-400 uppercase ml-2">Tarea / Orden</label>
+                <select 
+                  className="w-full p-4 mt-1 bg-gray-50 dark:bg-gray-900 dark:text-white rounded-2xl border-none outline-none focus:ring-2 focus:ring-orange-500"
+                  value={formData.job_card_id}
+                  onChange={(e) => setFormData({...formData, job_card_id: e.target.value})}
+                  required
+                >
+                  <option value="">Seleccionar Trabajo...</option>
+                  {jobCards.map(jc => (
+                    <option key={jc.id} value={jc.id}>
+                      {jc.order?.order_number} - {jc.order?.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-gray-400 uppercase ml-2">Material en Stock</label>
+                <select 
+                  className="w-full p-4 mt-1 bg-gray-50 dark:bg-gray-900 dark:text-white rounded-2xl border-none outline-none focus:ring-2 focus:ring-orange-500"
+                  value={formData.material_id}
+                  onChange={(e) => setFormData({...formData, material_id: e.target.value})}
+                  required
+                >
+                  <option value="">¿Qué material usaste?</option>
+                  {materials.map(m => (
+                    <option key={m.id} value={m.id} disabled={m.stock_quantity <= 0}>
+                      {m.name} ({m.stock_quantity} {m.unit} disponibles)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-gray-400 uppercase ml-2">Cantidad Utilizada</label>
+                <input 
+                  type="number" step="0.01"
+                  placeholder="Ej: 5.5"
+                  className="w-full p-4 mt-1 bg-gray-50 dark:bg-gray-900 dark:text-white rounded-2xl border-none outline-none focus:ring-2 focus:ring-orange-500"
+                  value={formData.quantity_used}
+                  onChange={(e) => setFormData({...formData, quantity_used: e.target.value})}
+                  required
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black hover:bg-orange-700 transition-all shadow-lg shadow-orange-200 dark:shadow-none disabled:opacity-50"
+              >
+                {loading ? 'Procesando...' : 'CONFIRMAR CONSUMO'}
+              </button>
+            </form>
+
+            {success && <Alert type="success" message={success} className="mt-4" />}
+            {error && <Alert type="error" message={error} className="mt-4" />}
           </div>
 
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border dark:border-gray-700 h-fit">
-            <h3 className="font-black dark:text-white mb-4">Recent Logs</h3>
-            {usageRecords.map(r => (
-              <div key={r.id} className="text-xs border-b dark:border-gray-700 py-3 text-gray-500">
-                Order <span className="text-orange-600">#{r.order?.order_number}</span>: {r.quantity_used} units
-              </div>
-            ))}
+          {/* Historial rápido */}
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border dark:border-gray-700">
+            <div className="flex items-center gap-2 mb-6 text-gray-400">
+              <History size={18} />
+              <h3 className="font-black uppercase text-sm tracking-widest">Últimos Registros</h3>
+            </div>
+            <div className="space-y-3">
+              {usageRecords.map(r => (
+                <div key={r.id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-xl border dark:border-gray-700">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs dark:text-white">{r.material?.name}</span>
+                    <span className="text-orange-600 font-black text-xs">-{r.quantity_used} {r.material?.unit}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1 uppercase">Orden: {r.order?.order_number}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

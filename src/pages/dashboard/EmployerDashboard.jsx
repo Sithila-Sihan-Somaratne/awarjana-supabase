@@ -1,8 +1,11 @@
+// src/pages/employer/EmployerDashboard.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Hammer, ClipboardList, Loader, AlertTriangle, Package } from 'lucide-react';
+import { 
+  Hammer, Loader, Package, CheckCircle, Send 
+} from 'lucide-react';
 import OrderCard from '../../components/common/OrderCard';
 
 export default function EmployerDashboard() {
@@ -15,8 +18,7 @@ export default function EmployerDashboard() {
     if (!user?.id) return;
     try {
       setLoading(true);
-      
-      // Fetching job cards + the joined order details
+      // FIX: Removed 'title' column which doesn't exist in orders table
       const { data, error } = await supabase
         .from('job_cards')
         .select(`
@@ -27,14 +29,15 @@ export default function EmployerDashboard() {
           order:orders (
             id,
             order_number,
-            title,
             priority,
             dimensions,
             material,
-            status
+            status,
+            total_amount
           )
         `)
         .eq('employer_id', user.id)
+        .neq('status', 'completed')
         .order('assigned_at', { ascending: false });
         
       if (error) throw error;
@@ -50,48 +53,52 @@ export default function EmployerDashboard() {
     fetchJobCards(); 
   }, [user?.id]);
 
-  const handleStatusUpdate = async (jobCardId, newStatus) => {
+  const handleStatusUpdate = async (jobId, newStatus) => {
     try {
-      // We don't need to send updated_at because the SQL trigger handles it
-      const { error } = await supabase
+      const { data: updatedJC, error: jcError } = await supabase
         .from('job_cards')
         .update({ status: newStatus })
-        .eq('id', jobCardId);
+        .eq('id', jobId)
+        .select('order_id')
+        .single();
 
-      if (error) throw error;
-      
-      // Refresh the list to reflect status change
-      fetchJobCards(); 
+      if (jcError) throw jcError;
+
+      let orderStatus = 'in_progress';
+      if (newStatus === 'completed') orderStatus = 'review';
+
+      await supabase
+        .from('orders')
+        .update({ status: orderStatus })
+        .eq('id', updatedJC.order_id);
+
+      fetchJobCards();
     } catch (err) {
-      alert("Failed to update status: " + err.message);
+      alert("Error: " + err.message);
     }
   };
 
   if (loading) return (
-    <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <Loader className="animate-spin text-orange-600" size={48} />
+    <div className="min-h-screen flex items-center justify-center dark:bg-black">
+      <Loader className="animate-spin text-indigo-600" />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-5 mb-10">
-          <div className="p-4 bg-orange-600 rounded-2xl text-white shadow-xl">
-            <Hammer size={32} />
+    <div className="min-h-screen bg-gray-50 dark:bg-black p-4 md:p-8">
+      <div className="max-w-6xl mx-auto">
+        <header className="mb-10">
+          <div className="flex items-center gap-3 mb-1">
+            <Hammer className="text-indigo-600" size={32} />
+            <h1 className="text-4xl font-black dark:text-white uppercase tracking-tighter">Production</h1>
           </div>
-          <div>
-            <h1 className="text-4xl font-black dark:text-white uppercase tracking-tighter">Workshop Floor</h1>
-            <p className="text-gray-500 font-bold uppercase text-xs">Technician Dashboard • 2026 Ready</p>
-          </div>
-        </div>
+          <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Active Workforce</p>
+        </header>
 
-        {/* Task Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {jobCards.length > 0 ? (
             jobCards.map(jc => (
-              <div key={jc.id} className="relative">
+              <div key={jc.id}>
                 <OrderCard 
                   order={jc.order} 
                   jobCardId={jc.id}
@@ -100,22 +107,26 @@ export default function EmployerDashboard() {
                   onAction={handleStatusUpdate}
                   onView={(order) => navigate(`/orders/${order.id}`)}
                 />
-                
-                {/* Secondary Actions */}
-                <div className="mt-4 flex gap-2 px-2">
+                <div className="mt-4 flex gap-3 px-2">
                    <button 
                     onClick={() => navigate(`/employer/material-usage?jobCard=${jc.id}`)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-2xl text-xs font-black dark:text-white hover:bg-gray-50 transition-all shadow-sm"
+                    className="flex-1 py-4 bg-white dark:bg-gray-900 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl text-[10px] font-black dark:text-white hover:border-orange-500 transition-all"
                   >
                     <Package size={14} /> LOG MATERIALS
+                  </button>
+                  <button 
+                    onClick={() => navigate(`/employer/submit-draft/${jc.order_id}`)}
+                    className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black hover:bg-indigo-700 transition-all"
+                  >
+                    <Send size={14} /> SUBMIT PROOF
                   </button>
                 </div>
               </div>
             ))
           ) : (
-            <div className="col-span-full bg-white dark:bg-gray-800 p-20 rounded-[3rem] text-center border dark:border-gray-700">
-              <AlertTriangle className="mx-auto text-orange-400 mb-4" size={48} />
-              <p className="text-gray-500 font-bold">No tasks currently assigned to you.</p>
+            <div className="col-span-full py-20 text-center">
+              <CheckCircle className="mx-auto text-green-400 mb-4" size={48} />
+              <p className="text-gray-500 font-bold uppercase text-xs">No active tasks assigned.</p>
             </div>
           )}
         </div>
