@@ -168,17 +168,10 @@ npx shadcn-ui@latest add dialog
 ## Migration Guide from v1.0.0
 
 ### Environment Variables
-**Old:**
+**Original!**
 ```env
 URL=url.com
 ANONKEY=AnonKEY
-# Plus many other OAuth/Manus variables
-```
-
-**New:**
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 ### Dependencies
