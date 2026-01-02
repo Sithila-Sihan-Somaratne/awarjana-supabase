@@ -213,7 +213,7 @@ export default function OrderDetails() {
                   {order.customer?.email?.charAt(0)}
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest leading-none mb-1">Owner</p>
+                  <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest leading-none mb-1">Performed By (Owner)</p>
                   <p className="text-xs font-bold dark:text-white truncate max-w-[150px]">{order.customer?.email}</p>
                 </div>
               </div>

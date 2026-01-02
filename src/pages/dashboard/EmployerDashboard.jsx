@@ -37,7 +37,9 @@ export default function EmployerDashboard() {
             status,
             cost,
             width,
-            height
+            height,
+            customer:users!orders_customer_id_fkey(full_name, email),
+            employer:users!orders_assigned_employer_id_fkey(full_name, email)
           )
         `)
         .eq('employer_id', user.id)

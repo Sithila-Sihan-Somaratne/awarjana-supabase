@@ -53,17 +53,33 @@ const OrderCard = ({ order, jobCardId, status, onView, onAction, userRole }) => 
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-2xl">
           <p className="text-[10px] text-gray-400 uppercase font-black">Size</p>
           <p className="text-sm font-bold dark:text-white">{displayDimensions}</p>
         </div>
         <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-2xl">
           <p className="text-[10px] text-gray-400 uppercase font-black">Project Type</p>
-          {/* FIX: Using production_type from your SQL schema instead of material */}
           <p className="text-sm font-bold dark:text-white truncate">
             {order?.production_type || 'Standard'}
           </p>
+        </div>
+      </div>
+
+      <div className="space-y-2 mb-6">
+        <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
+          <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-[10px] font-black text-indigo-600">P</div>
+          <div>
+            <p className="text-[8px] text-gray-400 uppercase font-black leading-none">Performed By (Owner)</p>
+            <p className="text-[10px] font-bold dark:text-white leading-tight">{order?.customer?.full_name || order?.customer?.email || 'Unknown'}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+          <div className="w-6 h-6 rounded-lg bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-[10px] font-black text-purple-600">T</div>
+          <div>
+            <p className="text-[8px] text-gray-400 uppercase font-black leading-none">Technician (Employer)</p>
+            <p className="text-[10px] font-bold dark:text-white leading-tight">{order?.employer?.full_name || order?.employer?.email || 'Awaiting Selection'}</p>
+          </div>
         </div>
       </div>
 
