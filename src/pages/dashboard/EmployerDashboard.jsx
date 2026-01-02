@@ -1,4 +1,5 @@
 // src/pages/employer/EmployerDashboard.jsx
+// FIXED VERSION - Removes non-existent columns and fixes query
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -13,37 +14,41 @@ export default function EmployerDashboard() {
   const navigate = useNavigate();
   const [jobCards, setJobCards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchJobCards = async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      // FIX: Removed 'title' column which doesn't exist in orders table
-      const { data, error } = await supabase
+      setError(null);
+      
+      // FIX: Removed non-existent columns: priority, dimensions, material
+      // In your schema, materials are in order_materials table
+      const { data, error: fetchError } = await supabase
         .from('job_cards')
         .select(`
           id,
           status,
           order_id,
-          assigned_at,
+          created_at,
           order:orders (
             id,
             order_number,
-            priority,
-            dimensions,
-            material,
             status,
-            total_amount
+            cost,
+            width,
+            height
           )
         `)
         .eq('employer_id', user.id)
         .neq('status', 'completed')
-        .order('assigned_at', { ascending: false });
+        .order('created_at', { ascending: false });
         
-      if (error) throw error;
+      if (fetchError) throw fetchError;
       setJobCards(data || []);
     } catch (err) {
       console.error("Employer Load Error:", err.message);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -95,6 +100,12 @@ export default function EmployerDashboard() {
           <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Active Workforce</p>
         </header>
 
+        {error && (
+          <div className="mb-8 p-4 bg-red-100 border border-red-200 text-red-700 rounded-2xl text-xs font-bold uppercase tracking-widest">
+            Error: {error}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {jobCards.length > 0 ? (
             jobCards.map(jc => (
@@ -110,13 +121,13 @@ export default function EmployerDashboard() {
                 <div className="mt-4 flex gap-3 px-2">
                    <button 
                     onClick={() => navigate(`/employer/material-usage?jobCard=${jc.id}`)}
-                    className="flex-1 py-4 bg-white dark:bg-gray-900 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl text-[10px] font-black dark:text-white hover:border-orange-500 transition-all"
+                    className="flex-1 py-4 bg-white dark:bg-gray-900 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl text-[10px] font-black dark:text-white hover:border-orange-500 transition-all flex items-center justify-center gap-2"
                   >
                     <Package size={14} /> LOG MATERIALS
                   </button>
                   <button 
                     onClick={() => navigate(`/employer/submit-draft/${jc.order_id}`)}
-                    className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black hover:bg-indigo-700 transition-all"
+                    className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
                   >
                     <Send size={14} /> SUBMIT PROOF
                   </button>

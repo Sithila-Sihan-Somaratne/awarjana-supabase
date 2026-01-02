@@ -1,197 +1,279 @@
-// src/pages/admin/AdminDashboard.jsx
+// src/pages/dashboard/AdminDashboard.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { 
-  Package, Users, BadgeDollarSign, RefreshCcw, 
-  ShieldCheck, AlertCircle, Clock, 
-  CheckCircle, TicketPlus, Hash, Inbox
+  TrendingUp, Package, Clock, CheckCircle, 
+  RefreshCw, AlertCircle, Eye, Check, X, UserPlus, Database, Key, Info
 } from 'lucide-react';
-import StatsCard from '../../components/common/StatsCard';
+import { useNavigate } from 'react-router-dom';
 import Alert from '../../components/common/Alert';
 
 export default function AdminDashboard() {
-  const [data, setData] = useState({ 
-    orders: [], employers: [], codes: [],
-    stats: { totalValue: 0, orderCount: 0, employerCount: 0, pendingCount: 0 } 
-  });
+  const navigate = useNavigate();
+  const [stats, setStats] = useState({ total: 0, pending: 0, active: 0, completed: 0 });
+  const [orders, setOrders] = useState([]);
+  const [pendingDrafts, setPendingDrafts] = useState([]);
+  const [employers, setEmployers] = useState([]);
+  const [codes, setCodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [assigningId, setAssigningId] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
-  const fetchGlobalData = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const [oRes, eRes, cRes] = await Promise.all([
-        supabase.from('orders').select('*, job_cards(id, employer_id)').order('created_at', { ascending: false }),
-        supabase.from('users').select('*').eq('role', 'employer'),
-        supabase.from('registration_codes').select('*').order('created_at', { ascending: false })
-      ]);
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          *, 
+          employer:users!orders_assigned_employer_id_fkey(full_name, email),
+          materials:order_materials(quantity, material:materials(name))
+        `)
+        .order('created_at', { ascending: false });
+      if (ordersError) throw ordersError;
 
-      if (oRes.error) throw oRes.error;
-      if (eRes.error) throw eRes.error;
-      if (cRes.error) throw cRes.error;
+      const { data: draftsData } = await supabase
+        .from('drafts')
+        .select(`*, order:orders(order_number, title, priority, cost), employer:users(full_name)`)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
 
-      const orders = oRes.data || [];
-      const employers = eRes.data || [];
-      const codes = cRes.data || [];
+      const { data: usersData } = await supabase.from('users').select('*').eq('role', 'employer');
 
-      // Calculate total value from cost or total_amount
-      const totalValue = orders.reduce((s, o) => s + (parseFloat(o.cost) || parseFloat(o.total_amount) || 0), 0);
+      const { data: codesData } = await supabase
+        .from('registration_codes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-      setData({
-        orders,
-        employers,
-        codes,
-        stats: {
-          orderCount: orders.length,
-          employerCount: employers.length,
-          // FIX: Check if job_cards is empty array OR null
-          pendingCount: orders.filter(o => !o.job_cards || o.job_cards.length === 0).length,
-          totalValue 
-        }
+      setOrders(ordersData || []);
+      setPendingDrafts(draftsData || []);
+      setEmployers(usersData || []);
+      setCodes(codesData || []);
+
+      setStats({
+        total: ordersData.length,
+        pending: ordersData.filter(o => o.status === 'pending').length,
+        active: ordersData.filter(o => ['assigned', 'in_progress', 'review'].includes(o.status)).length,
+        completed: ordersData.filter(o => o.status === 'completed').length
       });
-    } catch (err) {
-      setError("System Sync Error: " + err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
   };
 
-  const handleAssignEmployer = async (orderId, employerId) => {
+  useEffect(() => { fetchData(); }, []);
+
+  const handleAssignWorker = async (orderId, employerId) => {
     if (!employerId) return;
-    setAssigningId(orderId);
     try {
-      // 1. Create Job Card
-      const { error: jobError } = await supabase.from('job_cards').insert([{ 
-        order_id: orderId, 
-        employer_id: employerId, 
-        status: 'pending' 
-      }]);
-      if (jobError) throw jobError;
+      await supabase.from('orders').update({ status: 'assigned', assigned_employer_id: employerId }).eq('id', orderId);
+      await supabase.from('job_cards').upsert({ order_id: orderId, employer_id: employerId, status: 'assigned' }, { onConflict: 'order_id,employer_id' });
+      fetchData();
+      setSelectedOrder(null);
+    } catch (err) { alert(err.message); }
+  };
 
-      // 2. Update Order status
-      const { error: orderError } = await supabase.from('orders').update({ 
-        status: 'assigned',
-        assigned_employer_id: employerId // Syncing with your DB schema
-      }).eq('id', orderId);
+  const handleApproveDraft = async (draftId, orderId) => {
+    try {
+      await supabase.from('drafts').update({ status: 'approved' }).eq('id', draftId);
+      await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
+      fetchData();
+    } catch (err) { alert(err.message); }
+  };
 
-      if (orderError) throw orderError;
+  const handleRejectDraft = async (draftId, orderId) => {
+    try {
+      await supabase.from('drafts').update({ status: 'rejected' }).eq('id', draftId);
+      await supabase.from('orders').update({ status: 'in_progress' }).eq('id', orderId);
+      fetchData();
+    } catch (err) { alert(err.message); }
+  };
 
-      fetchGlobalData();
-    } catch (err) {
-      setError("Assignment Failed: " + err.message);
-    } finally {
-      setAssigningId(null);
+  const getPriorityColor = (p) => {
+    switch(p?.toLowerCase()) {
+      case 'urgent': return 'text-red-600 bg-red-50';
+      case 'high': return 'text-orange-600 bg-orange-50';
+      default: return 'text-blue-600 bg-blue-50';
     }
   };
 
-  useEffect(() => { fetchGlobalData(); }, []);
+  if (loading) return <div className="p-20 text-center"><RefreshCw className="animate-spin mx-auto text-indigo-600" /></div>;
 
   return (
-    // Changed bg to adapt to dark/light mode
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-white p-4 md:p-10 transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 dark:bg-black p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
-          <div className="flex items-center gap-5">
-            <div className="p-4 bg-indigo-600 rounded-2xl shadow-2xl shadow-indigo-500/20 text-white">
-              <ShieldCheck size={32} />
-            </div>
-            <div>
-              <h1 className="text-4xl font-black uppercase tracking-tighter">Admin Control</h1>
-              <p className="text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-[0.2em]">2026 Workshop Management</p>
-            </div>
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+          <div>
+            <h1 className="text-4xl font-black dark:text-white uppercase tracking-tighter">Supervisor Hub</h1>
+            <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Production Management 2026</p>
           </div>
           <div className="flex gap-3">
-            <button onClick={fetchGlobalData} className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-indigo-500 transition-all">
-              <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
+            <button onClick={() => navigate('/admin/inventory')} className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl shadow-sm border dark:border-gray-800 font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all">
+              <Database size={16} /> Inventory
             </button>
           </div>
-        </div>
-
-        {error && <Alert type="error" message={error} className="mb-8" />}
+        </header>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <StatsCard title="Total Orders" value={data.stats.orderCount} icon={Package} color="blue" />
-          <StatsCard title="Unassigned" value={data.stats.pendingCount} icon={Clock} color="amber" />
-          <StatsCard title="Active Staff" value={data.stats.employerCount} icon={Users} color="green" />
-          <StatsCard title="Value" value={`Rs. ${data.stats.totalValue}`} icon={BadgeDollarSign} color="indigo" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          {[
+            { label: 'Total Orders', value: stats.total, icon: <TrendingUp />, color: 'text-indigo-600' },
+            { label: 'Pending', value: stats.pending, icon: <Clock />, color: 'text-amber-500' },
+            { label: 'In Production', value: stats.active, icon: <Package />, color: 'text-blue-500' },
+            { label: 'Completed', value: stats.completed, icon: <CheckCircle />, color: 'text-green-500' }
+          ].map((s, i) => (
+            <div key={i} className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] border dark:border-gray-800 shadow-sm">
+              <div className={`mb-4 ${s.color}`}>{s.icon}</div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.label}</p>
+              <p className="text-3xl font-black dark:text-white">{s.value}</p>
+            </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Order Stream - Adaptive Theme */}
-          <div className="lg:col-span-2 bg-white dark:bg-[#111] rounded-[3rem] p-8 border border-gray-200 dark:border-gray-800 shadow-sm transition-colors">
-            <h2 className="text-2xl font-black mb-8 flex items-center gap-3">
-              <RefreshCcw size={24} className="text-indigo-500" /> Order Stream
-            </h2>
-            <div className="space-y-4">
-              {data.orders.length > 0 ? (
-                data.orders.map((order) => (
-                  <div key={order.id} className="flex flex-col sm:flex-row justify-between items-center p-6 rounded-3xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#161616] hover:border-indigo-500/50 transition-all">
-                    <div className="flex items-center gap-5 w-full">
-                      <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl">
-                        {order.order_number ? order.order_number.slice(-2) : '??'}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Pending Approvals */}
+            {pendingDrafts.length > 0 && (
+              <section>
+                <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-amber-500 flex items-center gap-2">
+                  <AlertCircle size={20} /> Pending Approvals
+                </h2>
+                <div className="space-y-4">
+                  {pendingDrafts.map(draft => (
+                    <div key={draft.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border-2 border-amber-100 shadow-sm flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden">
+                          <img src={draft.draft_url} className="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-indigo-600 uppercase">{draft.order?.order_number}</p>
+                          <p className="font-bold dark:text-white">{draft.order?.title}</p>
+                          <div className="flex gap-2 mt-1">
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${getPriorityColor(draft.order?.priority)}`}>{draft.order?.priority}</span>
+                            <span className="text-[10px] font-bold text-gray-500 uppercase">Rs. {draft.order?.cost}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-black text-lg tracking-tight">{order.order_number || "DRAFT_ORD"}</p>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{order.status}</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => handleApproveDraft(draft.id, draft.order_id)} className="p-3 bg-green-100 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all"><Check size={20} /></button>
+                        <button onClick={() => handleRejectDraft(draft.id, draft.order_id)} className="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all"><X size={20} /></button>
+                        <a href={draft.draft_url} target="_blank" rel="noreferrer" className="p-3 bg-gray-100 text-gray-500 rounded-xl"><Eye size={20} /></a>
                       </div>
                     </div>
-                    
-                    <div className="mt-4 sm:mt-0 w-full sm:w-auto">
-                      {(!order.job_cards || order.job_cards.length === 0) ? (
-                        <select 
-                          disabled={assigningId === order.id}
-                          onChange={(e) => handleAssignEmployer(order.id, e.target.value)}
-                          className="w-full sm:w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-xs font-bold outline-none focus:border-indigo-500"
-                        >
-                          <option value="">Assign Worker...</option>
-                          {data.employers.map(w => <option key={w.id} value={w.id}>{w.email}</option>)}
-                        </select>
-                      ) : (
-                        <div className="bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-500 px-4 py-2 rounded-xl border border-green-200 dark:border-green-500/20 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
-                          <CheckCircle size={14}/> Assigned
-                        </div>
-                      )}
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Active Orders */}
+            <section>
+              <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-400">Active Orders</h2>
+              <div className="space-y-4">
+                {orders.filter(o => o.status !== 'completed').map(order => (
+                  <div key={order.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border dark:border-gray-800 shadow-sm flex justify-between items-center">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-black text-indigo-600 uppercase">{order.order_number}</p>
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${getPriorityColor(order.priority)}`}>{order.priority}</span>
+                      </div>
+                      <p className="font-bold dark:text-white">{order.title || 'Custom Project'}</p>
+                      <span className="text-[10px] font-black text-gray-400 uppercase">{order.status.replace('_', ' ')}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setSelectedOrder(order)} className="p-3 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-xl hover:bg-gray-200 transition-all">
+                        <Info size={20} />
+                      </button>
+                      <select value={order.assigned_employer_id || ''} onChange={(e) => handleAssignWorker(order.id, e.target.value)} className="p-3 bg-gray-50 dark:bg-gray-800 dark:text-white rounded-xl border-none text-xs font-bold outline-none">
+                        <option value="">{order.assigned_employer_id ? 'Re-assign...' : 'Assign Worker...'}</option>
+                        {employers.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name || emp.email}</option>)}
+                      </select>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-20 bg-gray-50 dark:bg-[#161616] rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
-                  <Inbox className="mx-auto text-gray-400 mb-4" size={48} />
-                  <p className="text-gray-400 font-bold italic">No orders found.</p>
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            </section>
           </div>
 
-          {/* Registration Codes - Adaptive Theme */}
-          <div className="bg-white dark:bg-[#111] rounded-[3rem] p-8 border border-gray-200 dark:border-gray-800 shadow-sm transition-colors">
-            <h2 className="text-2xl font-black mb-8 flex items-center gap-3">
-              <Hash size={24} className="text-indigo-500" /> Reg-Codes
-            </h2>
-            <div className="space-y-3 overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
-              {data.codes.map(c => (
-                <div key={c.id} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-[#161616] rounded-2xl border border-gray-100 dark:border-gray-800">
-                  {/* Displays the unhashed code column */}
-                  <span className="font-mono font-black text-indigo-600 dark:text-indigo-400 text-lg tracking-tighter">
-                    {c.code || "HASHED"}
-                  </span>
-                  <span className={`text-[9px] font-black px-3 py-1 rounded-lg uppercase tracking-widest ${c.used ? 'bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-600' : 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-500 border dark:border-green-500/20'}`}>
-                    {c.used ? 'Used' : 'Active'}
-                  </span>
-                </div>
-              ))}
+          {/* Sidebar: Codes */}
+          <div className="space-y-8">
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border dark:border-gray-800 shadow-sm">
+              <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6">Reg-Codes</h3>
+              <div className="space-y-3">
+                {codes.map(c => (
+                  <div key={c.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border dark:border-gray-700">
+                    <p className="text-xs font-mono font-black text-indigo-600 truncate">{c.plain_code || 'HASHED'}</p>
+                    <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">{c.role}</p>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => navigate('/admin/codes')} className="w-full mt-6 py-4 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all">
+                Manage All Codes
+              </button>
             </div>
           </div>
-
         </div>
       </div>
+
+      {/* Order Details Modal */}
+      {selectedOrder && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl">
+            <div className="p-8 border-b dark:border-gray-800 flex justify-between items-center">
+              <div>
+                <p className="text-xs font-black text-indigo-600 uppercase tracking-widest">{selectedOrder.order_number}</p>
+                <h2 className="text-2xl font-black dark:text-white uppercase tracking-tighter">{selectedOrder.title}</h2>
+              </div>
+              <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all">
+                <X size={24} className="dark:text-white" />
+              </button>
+            </div>
+            <div className="p-8 space-y-8 max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Dimensions</p>
+                  <p className="text-lg font-bold dark:text-white">{selectedOrder.width}" × {selectedOrder.height}"</p>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Priority</p>
+                  <p className={`text-lg font-bold uppercase ${getPriorityColor(selectedOrder.priority)}`}>{selectedOrder.priority}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Materials Required</p>
+                <div className="space-y-2">
+                  {selectedOrder.materials?.map((m, i) => (
+                    <div key={i} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                      <span className="font-bold dark:text-white">{m.material?.name}</span>
+                      <span className="text-indigo-600 font-black">x{m.quantity}</span>
+                    </div>
+                  ))}
+                  {(!selectedOrder.materials || selectedOrder.materials.length === 0) && <p className="text-gray-500 italic">No materials specified.</p>}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Customer Notes</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 font-medium leading-relaxed">{selectedOrder.notes || 'No additional notes provided.'}</p>
+              </div>
+            </div>
+            <div className="p-8 bg-gray-50 dark:bg-gray-800 flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex items-center gap-3">
+                <UserPlus size={20} className="text-indigo-600" />
+                <select 
+                  value={selectedOrder.assigned_employer_id || ''} 
+                  onChange={(e) => handleAssignWorker(selectedOrder.id, e.target.value)}
+                  className="p-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl border-none text-xs font-bold outline-none shadow-sm"
+                >
+                  <option value="">Assign Worker...</option>
+                  {employers.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name || emp.email}</option>)}
+                </select>
+              </div>
+              <p className="text-xl font-black dark:text-white">Rs. {selectedOrder.cost}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

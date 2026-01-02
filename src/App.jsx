@@ -26,10 +26,10 @@ import AdminDashboard from './pages/dashboard/AdminDashboard';
 // Order Management
 import NewOrder from './pages/orders/NewOrder';
 import OrderDetails from './pages/orders/OrderDetails';
-import OrderTracker from './pages/orders/OrderTracker';
+import PublicOrderTracker from './pages/orders/PublicOrderTracker';
 
 // Employer Components
-import JobCards from './pages/employer/JobCards';
+import JobCardView from './pages/employer/JobCardView';
 import MaterialUsage from './pages/employer/MaterialUsage';
 import SubmitDraft from './pages/employer/SubmitDraft';
 
@@ -158,7 +158,7 @@ function AppRoutes() {
           path="/orders/track"
           element={
             <ProtectedRoute requiredRole="customer">
-              <OrderTracker />
+              <PublicOrderTracker />
             </ProtectedRoute>
           }
         />
@@ -176,7 +176,7 @@ function AppRoutes() {
           path="/employer/job-cards"
           element={
             <ProtectedRoute requiredRole="employer">
-              <JobCards />
+              <JobCardView />
             </ProtectedRoute>
           }
         />

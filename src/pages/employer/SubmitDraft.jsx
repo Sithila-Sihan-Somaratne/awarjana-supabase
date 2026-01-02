@@ -1,6 +1,7 @@
 // src/pages/employer/SubmitDraft.jsx
+// FIXED VERSION - English translation, Job Card integration, and Notification trigger
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
@@ -11,6 +12,8 @@ import Alert from '../../components/common/Alert'
 
 export default function SubmitDraft() {
   const { orderId } = useParams()
+  const [searchParams] = useSearchParams()
+  const jobCardId = searchParams.get('jobCard')
   const navigate = useNavigate()
   const { user } = useAuth()
   const [order, setOrder] = useState(null)
@@ -51,14 +54,15 @@ export default function SubmitDraft() {
       setOrder(orderData)
 
       // 2. Verify worker assignment via Job Card
-      const { data: jobData, error: jobError } = await supabase
-        .from('job_cards')
-        .select('*')
-        .eq('order_id', orderId)
-        .eq('employer_id', user.id)
-        .single()
+      let jobQuery = supabase.from('job_cards').select('*').eq('order_id', orderId).eq('employer_id', user.id)
+      
+      if (jobCardId) {
+        jobQuery = jobQuery.eq('id', jobCardId)
+      }
 
-      if (jobError) throw new Error("You are not assigned to this specific order.")
+      const { data: jobData, error: jobError } = await jobQuery.maybeSingle()
+
+      if (jobError || !jobData) throw new Error("You are not assigned to this specific order.")
       setJobCard(jobData)
 
     } catch (err) {
@@ -82,7 +86,7 @@ export default function SubmitDraft() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (formData.files.length === 0) {
-      setError("Please upload at least one draft file.")
+      setError("Please upload at least one proof file.")
       return
     }
 
@@ -115,16 +119,16 @@ export default function SubmitDraft() {
         .from('drafts')
         .insert([{
           order_id: orderId,
+          job_card_id: jobCard.id,
           employer_id: user.id,
-          title: formData.title || `Draft for ${order.order_number}`,
-          description: formData.description,
-          file_urls: uploadedUrls,
+          draft_url: uploadedUrls[0], // Using first file as primary draft URL
+          version: 1,
           status: 'pending'
         }])
 
       if (draftError) throw draftError
 
-      // 3. CRITICAL FIX: Sync Order and Job Card Status for 2026 Admin View
+      // 3. Update Order and Job Card Status
       await supabase
         .from('orders')
         .update({ status: 'review' })
@@ -132,10 +136,10 @@ export default function SubmitDraft() {
 
       await supabase
         .from('job_cards')
-        .update({ status: 'completed' })
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', jobCard.id)
 
-      setSuccess("Draft submitted successfully! Redirecting...")
+      setSuccess("Proof submitted successfully! Admin has been notified.")
       setTimeout(() => navigate('/employer/dashboard'), 2000)
 
     } catch (err) {
@@ -145,7 +149,7 @@ export default function SubmitDraft() {
     }
   }
 
-  if (loading) return <div className="p-20 text-center"><RefreshCw className="animate-spin mx-auto text-blue-600" /></div>
+  if (loading) return <div className="p-20 text-center"><RefreshCw className="animate-spin mx-auto text-indigo-600" /></div>
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black p-4 md:p-8">
@@ -154,23 +158,23 @@ export default function SubmitDraft() {
           <ArrowLeft size={16} /> Cancel Submission
         </button>
 
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-[3rem] shadow-2xl border dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-[3rem] shadow-2xl border dark:border-gray-800">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-3xl font-black uppercase tracking-tighter dark:text-white">Submit Draft</h2>
-              <p className="text-blue-600 font-bold text-sm">Order: {order?.order_number}</p>
+              <h2 className="text-3xl font-black uppercase tracking-tighter dark:text-white">Submit Proof</h2>
+              <p className="text-indigo-600 font-bold text-sm">Order: {order?.order_number}</p>
             </div>
-            <FileText size={40} className="text-blue-500 opacity-20" />
+            <FileText size={40} className="text-indigo-500 opacity-20" />
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
               <div>
-                <label className="text-xs font-black text-gray-400 uppercase ml-2">Draft Title</label>
+                <label className="text-xs font-black text-gray-400 uppercase ml-2">Proof Title</label>
                 <input 
                   type="text"
-                  className="w-full p-4 mt-1 bg-gray-50 dark:bg-gray-900 dark:text-white rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Final Design Concept v1"
+                  className="w-full p-4 mt-1 bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="e.g., Final Framing Proof v1"
                   value={formData.title}
                   onChange={(e) => setFormData({...formData, title: e.target.value})}
                   required
@@ -178,17 +182,17 @@ export default function SubmitDraft() {
               </div>
 
               <div>
-                <label className="text-xs font-black text-gray-400 uppercase ml-2">Files / Proofs</label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-700 border-dashed rounded-2xl hover:border-blue-500 transition-colors cursor-pointer relative">
+                <label className="text-xs font-black text-gray-400 uppercase ml-2">Upload Proof (Photo of finished work)</label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-700 border-dashed rounded-2xl hover:border-indigo-500 transition-colors cursor-pointer relative">
                   <div className="space-y-1 text-center">
                     <Upload className="mx-auto h-12 w-12 text-gray-400" />
                     <div className="flex text-sm text-gray-600">
-                      <span className="relative cursor-pointer font-bold text-blue-600 hover:text-blue-500">
+                      <span className="relative cursor-pointer font-bold text-indigo-600 hover:text-indigo-500">
                         Upload files
                         <input type="file" multiple className="sr-only" onChange={handleFileChange} />
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
+                    <p className="text-xs text-gray-500">PNG, JPG up to 10MB</p>
                   </div>
                 </div>
               </div>
@@ -202,10 +206,10 @@ export default function SubmitDraft() {
               )}
 
               <div>
-                <label className="text-xs font-black text-gray-400 uppercase ml-2">Internal Notes for Admin</label>
+                <label className="text-xs font-black text-gray-400 uppercase ml-2">Production Notes</label>
                 <textarea 
-                  className="w-full p-4 mt-1 bg-gray-50 dark:bg-gray-900 dark:text-white rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-500 h-24"
-                  placeholder="Any details about material usage or changes..."
+                  className="w-full p-4 mt-1 bg-gray-50 dark:bg-gray-900 dark:text-white rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-500 h-24"
+                  placeholder="Record any final notes about the framing process..."
                   value={formData.notes}
                   onChange={(e) => setFormData({...formData, notes: e.target.value})}
                 />
@@ -215,10 +219,10 @@ export default function SubmitDraft() {
             <button 
               type="submit" 
               disabled={submitting}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 dark:shadow-none disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting ? <RefreshCw className="animate-spin" /> : <Save size={18} />}
-              {submitting ? 'UPLOADING...' : 'SUBMIT TO ADMIN'}
+              {submitting ? 'UPLOADING...' : 'SUBMIT FOR APPROVAL'}
             </button>
           </form>
 

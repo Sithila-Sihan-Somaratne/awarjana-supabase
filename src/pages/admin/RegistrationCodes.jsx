@@ -1,4 +1,5 @@
 // src/pages/admin/RegistrationCodes.jsx
+// FIXED VERSION - Properly hashes codes before storage
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -29,12 +30,21 @@ export default function RegistrationCodes() {
     fetchCodes()
   }, [user, userRole])
 
+  // Hash function to match AuthContext
+  const hashCode = async (str) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+  };
+
   const fetchCodes = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // FIX: Improved select to get the profile name or email of the user who redeemed the code
       const { data, error: fetchError } = await supabase
         .from('registration_codes')
         .select(`
@@ -57,13 +67,16 @@ export default function RegistrationCodes() {
       setLoading(true)
       const newCodes = []
       
-      // FIX: Batch generation logic
+      // Generate codes with both plain and hashed versions
       for (let i = 0; i < generateCount; i++) {
-        const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+        const plainCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+        const hashedCode = await hashCode(plainCode)
+        
         newCodes.push({
-          code,
+          code: hashedCode,           // Store hashed for validation
+          plain_code: plainCode,      // Store plain for admin display
           role: generateRole,
-          used: false
+          is_used: false
         })
       }
 
@@ -130,7 +143,10 @@ export default function RegistrationCodes() {
               {codes.map(c => (
                 <tr key={c.id} className="group hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                   <td className="px-6 py-5">
-                    <span className="font-mono font-black text-lg text-indigo-600">{c.code}</span>
+                    {/* Display plain_code if available, otherwise show "HASHED" */}
+                    <span className="font-mono font-black text-lg text-indigo-600">
+                      {c.plain_code || "LEGACY-HASHED"}
+                    </span>
                   </td>
                   <td className="px-6 py-5">
                     <span className={`text-[10px] font-black px-2 py-1 rounded-lg uppercase ${c.role === 'admin' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>
@@ -138,7 +154,7 @@ export default function RegistrationCodes() {
                     </span>
                   </td>
                   <td className="px-6 py-5">
-                    {c.used ? (
+                    {c.is_used ? (
                       <div className="flex items-center gap-1 text-gray-400 font-bold text-xs uppercase"><XCircle size={14}/> Used</div>
                     ) : (
                       <div className="flex items-center gap-1 text-green-500 font-bold text-xs uppercase"><CheckCircle size={14}/> Active</div>
@@ -148,12 +164,12 @@ export default function RegistrationCodes() {
                     <span className="text-xs font-medium dark:text-gray-400">{c.used_by_user?.email || '—'}</span>
                   </td>
                   <td className="px-6 py-5 text-right">
-                    {!c.used && (
+                    {!c.is_used && c.plain_code && (
                       <button 
-                        onClick={() => copyToClipboard(c.code)}
+                        onClick={() => copyToClipboard(c.plain_code)}
                         className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
                       >
-                        {copiedCode === c.code ? <CheckCircle size={18} className="text-green-500" /> : <Copy size={18} />}
+                        {copiedCode === c.plain_code ? <CheckCircle size={18} className="text-green-500" /> : <Copy size={18} />}
                       </button>
                     )}
                   </td>
@@ -161,6 +177,13 @@ export default function RegistrationCodes() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Info Box */}
+        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-2xl">
+          <p className="text-xs text-blue-800 dark:text-blue-300 font-medium">
+            <strong>Note:</strong> Codes are stored as SHA-256 hashes for security. The plain text version is only shown here for distribution to users.
+          </p>
         </div>
       </div>
 
@@ -173,7 +196,7 @@ export default function RegistrationCodes() {
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Role</label>
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                  {['employer', 'customer'].map(r => (
+                  {['employer', 'admin'].map(r => (
                     <button 
                       key={r}
                       onClick={() => setGenerateRole(r)}
@@ -190,7 +213,7 @@ export default function RegistrationCodes() {
                   type="number" min="1" max="10"
                   className="w-full p-4 mt-2 bg-gray-50 dark:bg-gray-800 rounded-2xl border-none font-bold dark:text-white"
                   value={generateCount}
-                  onChange={(e) => setGenerateCount(e.target.value)}
+                  onChange={(e) => setGenerateCount(parseInt(e.target.value) || 1)}
                 />
               </div>
               <div className="flex gap-3 pt-4">
