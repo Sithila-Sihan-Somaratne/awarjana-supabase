@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
-  Package, Plus, Edit2, Trash2, AlertTriangle, Search, Filter, RefreshCw, X
+  Package, Plus, Edit2, Trash2, AlertTriangle, Search, Filter, RefreshCw, X, ArrowLeft
 } from 'lucide-react'
 import Alert from '../../components/common/Alert'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
@@ -19,7 +19,6 @@ export default function InventoryManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   
-  // Modal States
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [formData, setFormData] = useState({
@@ -129,12 +128,23 @@ export default function InventoryManagement() {
             <h1 className="text-4xl font-black dark:text-white uppercase tracking-tighter">Inventory</h1>
             <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">Stock Control Center 2026</p>
           </div>
-          <button 
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-all"
-          >
-            <Plus size={20} /> ADD MATERIAL
-          </button>
+          
+          <div className="flex flex-wrap gap-3">
+            {/* GO TO DASHBOARD BUTTON */}
+            <button 
+              onClick={() => navigate('/admin/dashboard')}
+              className="flex items-center gap-2 px-6 py-3 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-white rounded-2xl font-black hover:bg-gray-300 dark:hover:bg-gray-700 transition-all"
+            >
+              <ArrowLeft size={20} /> DASHBOARD
+            </button>
+
+            <button 
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-all"
+            >
+              <Plus size={20} /> ADD MATERIAL
+            </button>
+          </div>
         </header>
 
         {/* Filters */}
