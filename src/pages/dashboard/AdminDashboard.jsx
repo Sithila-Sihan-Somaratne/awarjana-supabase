@@ -22,7 +22,7 @@ export default function AdminDashboard() {
       setLoading(true);
       setError(null);
 
-      // 1. Fetch Orders with all relations
+      // 1. Fetch Orders - Make sure we join correctly to get the assigned employer
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
@@ -36,16 +36,17 @@ export default function AdminDashboard() {
 
       if (ordersError) throw ordersError;
 
-      // 2. Fetch Pending Drafts
       const { data: draftsData } = await supabase
         .from('drafts')
         .select('*, order:orders(order_number, title, priority, cost)')
         .eq('status', 'pending');
 
-      // 3. Fetch Employers
-      const { data: usersData } = await supabase.from('users').select('*').eq('role', 'employer');
+      // 2. Fetch Employers - Explicitly select id, name, and email
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .eq('role', 'employer');
 
-      // 4. Fetch Registration Codes
       const { data: codesData } = await supabase
         .from('registration_codes')
         .select('*')
@@ -75,12 +76,14 @@ export default function AdminDashboard() {
   const handleAssignWorker = async (orderId, employerId) => {
     if (!employerId) return;
     try {
+      // Update the order status AND the assigned ID
       const { error: updateError } = await supabase
         .from('orders')
         .update({ status: 'assigned', assigned_employer_id: employerId })
         .eq('id', orderId);
       if (updateError) throw updateError;
 
+      // Ensure the job card table is in sync
       await supabase.from('job_cards').upsert({ 
         order_id: orderId, 
         employer_id: employerId, 
@@ -124,7 +127,7 @@ export default function AdminDashboard() {
             <h1 className="text-4xl font-black dark:text-white uppercase tracking-tighter italic">Supervisor Hub</h1>
             <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Awarjana Production 2026</p>
           </div>
-          <button onClick={() => navigate('/admin/inventory')} className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl shadow-sm border dark:border-gray-800 font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all">
+          <button onClick={() => navigate('/admin/inventory')} className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl shadow-sm border dark:border-gray-800 font-black text-[10px] uppercase tracking-widest">
             <Database size={16} /> Inventory
           </button>
         </header>
@@ -171,12 +174,18 @@ export default function AdminDashboard() {
               </section>
             )}
 
-            {/* 2. Active Production & Order Assignment */}
+            {/* 2. Production Queue (The Fixed Section) */}
             <section>
-              <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-400">Active Production</h2>
+              <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-400">Production Queue</h2>
               <div className="space-y-4">
                 {orders.filter(o => o.status !== 'completed').map(order => {
-                  const jobStatus = order.job_cards?.[0]?.status || 'assigned';
+                  // FIX 1: Determine status based on actual data
+                  const isAssigned = !!order.assigned_employer_id;
+                  const currentJobStatus = order.job_cards?.[0]?.status || order.status;
+                  
+                  // FIX 2: Fallback for worker name
+                  const workerDisplayName = order.employer?.full_name || order.employer?.email || 'Unassigned';
+
                   return (
                     <div key={order.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] border dark:border-gray-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                       <div className="flex-1">
@@ -185,33 +194,42 @@ export default function AdminDashboard() {
                           <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${getPriorityColor(order.priority)}`}>{order.priority}</span>
                         </div>
                         <p className="font-bold dark:text-white">{order.title}</p>
-                        <div className="mt-2 flex items-center gap-2">
+                        
+                        <div className="mt-3 flex items-center gap-2">
+                            {/* Status Badge */}
                             <span className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase ${
-                              jobStatus === 'in_progress' ? 'bg-blue-100 text-blue-600' : 
-                              jobStatus === 'assigned' ? 'bg-purple-100 text-purple-600' : 
-                              'bg-amber-100 text-amber-600'
+                              !isAssigned ? 'bg-amber-100 text-amber-600' :
+                              currentJobStatus === 'in_progress' ? 'bg-blue-100 text-blue-600' : 
+                              'bg-purple-100 text-purple-600'
                             }`}>
-                              {jobStatus.replace('_', ' ')}
+                              {isAssigned ? currentJobStatus.replace('_', ' ') : 'Waiting for Worker'}
                             </span>
-                            <span className="text-[10px] font-black text-purple-600 uppercase tracking-tighter bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded">
-                              Worker: {order.employer?.full_name || 'Not assigned'}
+
+                            {/* Worker Info Badge */}
+                            <span className={`text-[10px] font-black uppercase tracking-tighter px-2 py-1 rounded ${
+                              isAssigned ? 'bg-purple-50 text-purple-600 dark:bg-purple-900/20' : 'text-gray-400'
+                            }`}>
+                              Worker: {workerDisplayName}
                             </span>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3 w-full md:w-auto">
-                        <button onClick={() => setSelectedOrder(order)} className="px-6 py-4 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-2xl font-black text-[10px] uppercase tracking-widest">
+                        <button onClick={() => setSelectedOrder(order)} className="px-6 py-4 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-2xl font-black text-[10px] uppercase">
                           Details
                         </button>
-                        {/* THE DROPDOWN WITH VISIBLE COLORS */}
+                        
+                        {/* THE DROPDOWN: Fixed visibility and name fallbacks */}
                         <select 
                           value={order.assigned_employer_id || ''} 
                           onChange={(e) => handleAssignWorker(order.id, e.target.value)} 
-                          className="p-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-100 dark:border-gray-700 rounded-2xl text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none"
+                          className="p-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-100 dark:border-gray-700 rounded-2xl text-[10px] font-black uppercase outline-none focus:border-indigo-500"
                         >
-                          <option value="" className="text-gray-400">Assign Worker...</option>
+                          <option value="">Assign Worker...</option>
                           {employers.map(emp => (
-                            <option key={emp.id} value={emp.id} className="text-black dark:text-white bg-white dark:bg-gray-800">{emp.full_name}</option>
+                            <option key={emp.id} value={emp.id} className="text-black bg-white">
+                              {emp.full_name || emp.email}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -234,7 +252,9 @@ export default function AdminDashboard() {
                       <Check size={14} className="text-green-500" />
                     </div>
                     <p className="font-bold dark:text-white text-sm truncate">{order.title}</p>
-                    <p className="text-[9px] text-gray-500 uppercase mt-2">By: {order.employer?.full_name || 'System'}</p>
+                    <p className="text-[9px] text-gray-500 uppercase mt-2">
+                      By: {order.employer?.full_name || order.employer?.email || 'System'}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -242,7 +262,8 @@ export default function AdminDashboard() {
           </div>
 
           <div className="space-y-8">
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border dark:border-gray-800 shadow-sm">
+            {/* Sidebar with Access Keys */}
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border dark:border-gray-800">
               <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                 <Key size={16} /> Access Keys
               </h3>
@@ -262,6 +283,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Detail Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl">
@@ -290,10 +312,14 @@ export default function AdminDashboard() {
                 <select 
                   value={selectedOrder.assigned_employer_id || ''} 
                   onChange={(e) => handleAssignWorker(selectedOrder.id, e.target.value)}
-                  className="p-4 bg-white dark:bg-black text-gray-900 dark:text-white border-2 border-indigo-100 dark:border-indigo-900 rounded-2xl text-xs font-bold outline-none shadow-lg focus:ring-2 ring-indigo-500"
+                  className="p-4 bg-white dark:bg-black text-gray-900 dark:text-white border-2 border-indigo-100 dark:border-indigo-900 rounded-2xl text-xs font-bold outline-none"
                 >
                   <option value="">Reassign Worker...</option>
-                  {employers.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name}</option>)}
+                  {employers.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.full_name || emp.email}
+                    </option>
+                  ))}
                 </select>
                 <p className="text-2xl font-black dark:text-white italic">Rs. {selectedOrder.cost}</p>
               </div>
