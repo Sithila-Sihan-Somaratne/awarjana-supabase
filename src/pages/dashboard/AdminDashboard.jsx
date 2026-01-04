@@ -18,6 +18,11 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+/**
+ * AdminDashboard
+ * High-level overview for supervisors to manage production flow,
+ * assign workers to orders, and approve final drafts.
+ */
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState({
@@ -39,7 +44,7 @@ export default function AdminDashboard() {
       setLoading(true);
       setError(null);
 
-      // 1. Fetch Orders - Make sure we join correctly to get the assigned employer
+      // 1. Fetch Orders with Joins
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(
@@ -55,17 +60,19 @@ export default function AdminDashboard() {
 
       if (ordersError) throw ordersError;
 
+      // 2. Fetch Pending Drafts
       const { data: draftsData } = await supabase
         .from("drafts")
         .select("*, order:orders(order_number, title, priority, cost)")
         .eq("status", "pending");
 
-      // 2. Fetch Employers - Explicitly select id, name, and email
+      // 3. Fetch Employers for Assignment
       const { data: usersData } = await supabase
         .from("users")
         .select("id, full_name, email")
         .eq("role", "employer");
 
+      // 4. Fetch Registration Codes
       const { data: codesData } = await supabase
         .from("registration_codes")
         .select("*")
@@ -86,6 +93,7 @@ export default function AdminDashboard() {
         completed: ordersData.filter((o) => o.status === "completed").length,
       });
     } catch (err) {
+      console.error("Dashboard Fetch Error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -99,14 +107,13 @@ export default function AdminDashboard() {
   const handleAssignWorker = async (orderId, employerId) => {
     if (!employerId) return;
     try {
-      // Update the order status AND the assigned ID
       const { error: updateError } = await supabase
         .from("orders")
         .update({ status: "assigned", assigned_employer_id: employerId })
         .eq("id", orderId);
+      
       if (updateError) throw updateError;
 
-      // Ensure the job card table is in sync
       await supabase.from("job_cards").upsert(
         {
           order_id: orderId,
@@ -119,7 +126,7 @@ export default function AdminDashboard() {
       fetchData();
       if (selectedOrder) setSelectedOrder(null);
     } catch (err) {
-      alert(err.message);
+      alert("Assignment failed: " + err.message);
     }
   };
 
@@ -130,28 +137,28 @@ export default function AdminDashboard() {
         .from("drafts")
         .update({ status: "approved" })
         .eq("id", draftId);
+      
       await supabase
         .from("orders")
         .update({ status: "completed", completed_at: now })
         .eq("id", orderId);
+      
       await supabase
         .from("job_cards")
         .update({ status: "completed", completed_at: now })
         .eq("order_id", orderId);
+      
       fetchData();
     } catch (err) {
-      alert(err.message);
+      alert("Approval failed: " + err.message);
     }
   };
 
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
-      case "high":
-        return "bg-red-100 text-red-600";
-      case "medium":
-        return "bg-amber-100 text-amber-600";
-      default:
-        return "bg-blue-100 text-blue-600";
+      case "high": return "bg-red-100 text-red-600";
+      case "medium": return "bg-amber-100 text-amber-600";
+      default: return "bg-blue-100 text-blue-600";
     }
   };
 
@@ -176,42 +183,24 @@ export default function AdminDashboard() {
           </div>
           <button
             onClick={() => navigate("/admin/inventory")}
-            className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl shadow-sm border dark:border-gray-800 font-black text-[10px] uppercase tracking-widest"
+            className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl shadow-sm border dark:border-gray-800 font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-colors"
           >
             <Database size={16} /> Inventory
           </button>
         </header>
 
+        {/* Status Highlights */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <StatCard
-            title="Total"
-            value={stats.total}
-            icon={Package}
-            color="indigo"
-          />
-          <StatCard
-            title="Pending"
-            value={stats.pending}
-            icon={Clock}
-            color="amber"
-          />
-          <StatCard
-            title="Active"
-            value={stats.active}
-            icon={TrendingUp}
-            color="blue"
-          />
-          <StatCard
-            title="Done"
-            value={stats.completed}
-            icon={CheckCircle}
-            color="green"
-          />
+          <StatCard title="Total" value={stats.total} icon={Package} color="indigo" />
+          <StatCard title="Pending" value={stats.pending} icon={Clock} color="amber" />
+          <StatCard title="Active" value={stats.active} icon={TrendingUp} color="blue" />
+          <StatCard title="Done" value={stats.completed} icon={CheckCircle} color="green" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
-            {/* 1. Pending Approvals */}
+            
+            {/* 1. Action Required: Draft Approvals */}
             {pendingDrafts.length > 0 && (
               <section>
                 <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-amber-500 flex items-center gap-2">
@@ -228,24 +217,20 @@ export default function AdminDashboard() {
                           <img
                             src={draft.draft_url}
                             className="w-full h-full object-cover"
-                            alt="Draft"
+                            alt="Draft Preview"
                           />
                         </div>
                         <div>
                           <p className="text-xs font-black text-indigo-600 uppercase">
                             {draft.order?.order_number}
                           </p>
-                          <p className="font-bold dark:text-white">
-                            {draft.order?.title}
-                          </p>
+                          <p className="font-bold dark:text-white">{draft.order?.title}</p>
                         </div>
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() =>
-                            handleApproveDraft(draft.id, draft.order_id)
-                          }
-                          className="p-4 bg-green-500 text-white rounded-2xl hover:bg-green-600 transition-all"
+                          onClick={() => handleApproveDraft(draft.id, draft.order_id)}
+                          className="p-4 bg-green-500 text-white rounded-2xl hover:bg-green-600 transition-all shadow-lg shadow-green-500/20"
                         >
                           <Check size={20} />
                         </button>
@@ -253,7 +238,7 @@ export default function AdminDashboard() {
                           href={draft.draft_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="p-4 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-2xl"
+                          className="p-4 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-2xl hover:bg-gray-200 transition-colors"
                         >
                           <Eye size={20} />
                         </a>
@@ -273,18 +258,9 @@ export default function AdminDashboard() {
                 {orders
                   .filter((o) => o.status !== "completed")
                   .map((order) => {
-                    // FIX: Determine assignment based on the actual ID in the database
                     const isAssigned = !!order.assigned_employer_id;
-
-                    // FIX: Get the actual status from the job card, or fall back to the order status
-                    const currentStatus =
-                      order.job_cards?.[0]?.status || order.status;
-
-                    // FIX: Fallback to email if full_name is empty in the DB
-                    const workerName =
-                      order.employer?.full_name ||
-                      order.employer?.email ||
-                      "Unassigned";
+                    const currentStatus = order.job_cards?.[0]?.status || order.status;
+                    const workerName = order.employer?.full_name || order.employer?.email || "Unassigned";
 
                     return (
                       <div
@@ -296,40 +272,23 @@ export default function AdminDashboard() {
                             <p className="text-xs font-black text-indigo-600 uppercase">
                               {order.order_number}
                             </p>
-                            <span
-                              className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${getPriorityColor(
-                                order.priority
-                              )}`}
-                            >
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${getPriorityColor(order.priority)}`}>
                               {order.priority}
                             </span>
                           </div>
-                          <p className="font-bold dark:text-white">
-                            {order.title}
-                          </p>
+                          <p className="font-bold dark:text-white">{order.title}</p>
 
                           <div className="mt-3 flex items-center gap-2">
-                            {/* Corrected Status Badge */}
-                            <span
-                              className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase ${
-                                !isAssigned
-                                  ? "bg-amber-100 text-amber-600"
-                                  : currentStatus === "in_progress"
-                                  ? "bg-blue-100 text-blue-600"
-                                  : "bg-purple-100 text-purple-600"
+                            <span className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase ${
+                                !isAssigned ? "bg-amber-100 text-amber-600" : 
+                                currentStatus === "in_progress" ? "bg-blue-100 text-blue-600" : 
+                                "bg-purple-100 text-purple-600"
                               }`}
                             >
-                              {isAssigned
-                                ? currentStatus.replace("_", " ")
-                                : "Waiting for Worker"}
+                              {isAssigned ? currentStatus.replace("_", " ") : "Waiting for Worker"}
                             </span>
-
-                            {/* Corrected Worker Name Badge */}
-                            <span
-                              className={`text-[10px] font-black uppercase tracking-tighter px-2 py-1 rounded ${
-                                isAssigned
-                                  ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20"
-                                  : "text-gray-400"
+                            <span className={`text-[10px] font-black uppercase tracking-tighter px-2 py-1 rounded ${
+                                isAssigned ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20" : "text-gray-400"
                               }`}
                             >
                               Worker: {workerName}
@@ -340,26 +299,18 @@ export default function AdminDashboard() {
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => setSelectedOrder(order)}
-                            className="px-6 py-4 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-2xl font-black text-[10px] uppercase"
+                            className="px-6 py-4 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-2xl font-black text-[10px] uppercase hover:bg-gray-200"
                           >
                             Details
                           </button>
-
-                          {/* Worker Selection Dropdown */}
                           <select
                             value={order.assigned_employer_id || ""}
-                            onChange={(e) =>
-                              handleAssignWorker(order.id, e.target.value)
-                            }
-                            className="p-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-100 dark:border-gray-700 rounded-2xl text-[10px] font-black uppercase outline-none focus:border-indigo-500"
+                            onChange={(e) => handleAssignWorker(order.id, e.target.value)}
+                            className="p-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-100 dark:border-gray-700 rounded-2xl text-[10px] font-black uppercase outline-none focus:border-indigo-500 cursor-pointer"
                           >
                             <option value="">Assign Worker...</option>
                             {employers.map((emp) => (
-                              <option
-                                key={emp.id}
-                                value={emp.id}
-                                className="text-black bg-white"
-                              >
+                              <option key={emp.id} value={emp.id}>
                                 {emp.full_name || emp.email}
                               </option>
                             ))}
@@ -381,24 +332,14 @@ export default function AdminDashboard() {
                   .filter((o) => o.status === "completed")
                   .slice(0, 4)
                   .map((order) => (
-                    <div
-                      key={order.id}
-                      className="bg-white dark:bg-gray-900 p-5 rounded-[2rem] border dark:border-gray-800"
-                    >
+                    <div key={order.id} className="bg-white dark:bg-gray-900 p-5 rounded-[2rem] border dark:border-gray-800">
                       <div className="flex justify-between items-start mb-2">
-                        <p className="text-[10px] font-black text-indigo-500 uppercase">
-                          {order.order_number}
-                        </p>
+                        <p className="text-[10px] font-black text-indigo-500 uppercase">{order.order_number}</p>
                         <Check size={14} className="text-green-500" />
                       </div>
-                      <p className="font-bold dark:text-white text-sm truncate">
-                        {order.title}
-                      </p>
+                      <p className="font-bold dark:text-white text-sm truncate">{order.title}</p>
                       <p className="text-[9px] text-gray-500 uppercase mt-2">
-                        By:{" "}
-                        {order.employer?.full_name ||
-                          order.employer?.email ||
-                          "System"}
+                        By: {order.employer?.full_name || order.employer?.email || "System"}
                       </p>
                     </div>
                   ))}
@@ -406,29 +347,20 @@ export default function AdminDashboard() {
             </section>
           </div>
 
+          {/* Sidebar */}
           <div className="space-y-8">
-            {/* Sidebar with Access Keys */}
             <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border dark:border-gray-800">
               <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                 <Key size={16} /> Access Keys
               </h3>
               <div className="space-y-3">
                 {codes.map((c) => (
-                  <div
-                    key={c.id}
-                    className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border dark:border-gray-700 flex justify-between items-center"
-                  >
+                  <div key={c.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border dark:border-gray-700 flex justify-between items-center">
                     <div>
-                      <p className="text-xs font-mono font-black text-indigo-600">
-                        {c.plain_code || "HIDDEN"}
-                      </p>
-                      <p className="text-[10px] text-gray-500 uppercase font-bold">
-                        {c.role}
-                      </p>
+                      <p className="text-xs font-mono font-black text-indigo-600">{c.plain_code || "HIDDEN"}</p>
+                      <p className="text-[10px] text-gray-500 uppercase font-bold">{c.role}</p>
                     </div>
-                    {c.used && (
-                      <CheckCircle size={14} className="text-green-500" />
-                    )}
+                    {c.used && <CheckCircle size={14} className="text-green-500" />}
                   </div>
                 ))}
               </div>
@@ -440,40 +372,24 @@ export default function AdminDashboard() {
       {/* Detail Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="p-8 border-b dark:border-gray-800 flex justify-between items-center">
               <div>
-                <p className="text-xs font-black text-indigo-600 uppercase">
-                  {selectedOrder.order_number}
-                </p>
-                <h2 className="text-2xl font-black dark:text-white uppercase">
-                  {selectedOrder.title}
-                </h2>
+                <p className="text-xs font-black text-indigo-600 uppercase">{selectedOrder.order_number}</p>
+                <h2 className="text-2xl font-black dark:text-white uppercase">{selectedOrder.title}</h2>
               </div>
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full"
-              >
+              <button onClick={() => setSelectedOrder(null)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 transition-colors">
                 <X size={24} className="dark:text-white" />
               </button>
             </div>
             <div className="p-8 space-y-6">
               <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">
-                  Materials
-                </p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Materials Required</p>
                 <div className="grid grid-cols-2 gap-2">
                   {selectedOrder.materials?.map((m, i) => (
-                    <div
-                      key={i}
-                      className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl flex justify-between"
-                    >
-                      <span className="font-bold text-xs dark:text-white">
-                        {m.material?.name}
-                      </span>
-                      <span className="text-indigo-600 font-black text-xs">
-                        x{m.quantity}
-                      </span>
+                    <div key={i} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl flex justify-between border dark:border-gray-700">
+                      <span className="font-bold text-xs dark:text-white">{m.material?.name}</span>
+                      <span className="text-indigo-600 font-black text-xs">x{m.quantity}</span>
                     </div>
                   ))}
                 </div>
@@ -481,21 +397,15 @@ export default function AdminDashboard() {
               <div className="pt-6 border-t dark:border-gray-800 flex justify-between items-center">
                 <select
                   value={selectedOrder.assigned_employer_id || ""}
-                  onChange={(e) =>
-                    handleAssignWorker(selectedOrder.id, e.target.value)
-                  }
+                  onChange={(e) => handleAssignWorker(selectedOrder.id, e.target.value)}
                   className="p-4 bg-white dark:bg-black text-gray-900 dark:text-white border-2 border-indigo-100 dark:border-indigo-900 rounded-2xl text-xs font-bold outline-none"
                 >
                   <option value="">Reassign Worker...</option>
                   {employers.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.full_name || emp.email}
-                    </option>
+                    <option key={emp.id} value={emp.id}>{emp.full_name || emp.email}</option>
                   ))}
                 </select>
-                <p className="text-2xl font-black dark:text-white italic">
-                  Rs. {selectedOrder.cost}
-                </p>
+                <p className="text-2xl font-black dark:text-white italic">Rs. {selectedOrder.cost}</p>
               </div>
             </div>
           </div>
@@ -514,14 +424,10 @@ function StatCard({ title, value, icon: Icon, color }) {
   };
   return (
     <div className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] shadow-sm border dark:border-gray-800 transition-transform hover:scale-[1.02]">
-      <div
-        className={`w-12 h-12 rounded-2xl ${colors[color]} flex items-center justify-center mb-4`}
-      >
+      <div className={`w-12 h-12 rounded-2xl ${colors[color]} flex items-center justify-center mb-4`}>
         <Icon size={24} />
       </div>
-      <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
-        {title}
-      </p>
+      <p className="text-xs font-black text-gray-400 uppercase tracking-widest">{title}</p>
       <p className="text-3xl font-black dark:text-white mt-1">{value}</p>
     </div>
   );
