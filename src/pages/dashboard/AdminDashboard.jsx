@@ -22,6 +22,7 @@ export default function AdminDashboard() {
       setLoading(true);
       setError(null);
 
+      // 1. Fetch Orders with all relations
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
@@ -35,13 +36,16 @@ export default function AdminDashboard() {
 
       if (ordersError) throw ordersError;
 
+      // 2. Fetch Pending Drafts
       const { data: draftsData } = await supabase
         .from('drafts')
         .select('*, order:orders(order_number, title, priority, cost)')
         .eq('status', 'pending');
 
+      // 3. Fetch Employers
       const { data: usersData } = await supabase.from('users').select('*').eq('role', 'employer');
 
+      // 4. Fetch Registration Codes
       const { data: codesData } = await supabase
         .from('registration_codes')
         .select('*')
@@ -134,6 +138,8 @@ export default function AdminDashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
+            
+            {/* 1. Pending Approvals */}
             {pendingDrafts.length > 0 && (
               <section>
                 <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-amber-500 flex items-center gap-2">
@@ -165,6 +171,7 @@ export default function AdminDashboard() {
               </section>
             )}
 
+            {/* 2. Active Production & Order Assignment */}
             <section>
               <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-400">Active Production</h2>
               <div className="space-y-4">
@@ -172,13 +179,20 @@ export default function AdminDashboard() {
                   const jobStatus = order.job_cards?.[0]?.status || 'assigned';
                   return (
                     <div key={order.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] border dark:border-gray-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                      <div>
+                      <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <p className="text-xs font-black text-indigo-600 uppercase">{order.order_number}</p>
                           <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${getPriorityColor(order.priority)}`}>{order.priority}</span>
                         </div>
                         <p className="font-bold dark:text-white">{order.title}</p>
-                        <div className="mt-2">
+                        <div className="mt-2 flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase ${
+                              jobStatus === 'in_progress' ? 'bg-blue-100 text-blue-600' : 
+                              jobStatus === 'assigned' ? 'bg-purple-100 text-purple-600' : 
+                              'bg-amber-100 text-amber-600'
+                            }`}>
+                              {jobStatus.replace('_', ' ')}
+                            </span>
                             <span className="text-[10px] font-black text-purple-600 uppercase tracking-tighter bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded">
                               Worker: {order.employer?.full_name || 'Not assigned'}
                             </span>
@@ -189,20 +203,40 @@ export default function AdminDashboard() {
                         <button onClick={() => setSelectedOrder(order)} className="px-6 py-4 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-2xl font-black text-[10px] uppercase tracking-widest">
                           Details
                         </button>
+                        {/* THE DROPDOWN WITH VISIBLE COLORS */}
                         <select 
                           value={order.assigned_employer_id || ''} 
                           onChange={(e) => handleAssignWorker(order.id, e.target.value)} 
-                          className="p-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-100 dark:border-gray-700 rounded-2xl text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-sm"
+                          className="p-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-100 dark:border-gray-700 rounded-2xl text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none"
                         >
                           <option value="" className="text-gray-400">Assign Worker...</option>
                           {employers.map(emp => (
-                            <option key={emp.id} value={emp.id} className="text-black dark:text-white">{emp.full_name}</option>
+                            <option key={emp.id} value={emp.id} className="text-black dark:text-white bg-white dark:bg-gray-800">{emp.full_name}</option>
                           ))}
                         </select>
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            </section>
+
+            {/* 3. Recently Completed */}
+            <section>
+              <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-green-500 flex items-center gap-2">
+                <CheckSquare size={20} /> Recently Completed
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {orders.filter(o => o.status === 'completed').slice(0, 4).map(order => (
+                  <div key={order.id} className="bg-white dark:bg-gray-900 p-5 rounded-[2rem] border dark:border-gray-800">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="text-[10px] font-black text-indigo-500 uppercase">{order.order_number}</p>
+                      <Check size={14} className="text-green-500" />
+                    </div>
+                    <p className="font-bold dark:text-white text-sm truncate">{order.title}</p>
+                    <p className="text-[9px] text-gray-500 uppercase mt-2">By: {order.employer?.full_name || 'System'}</p>
+                  </div>
+                ))}
               </div>
             </section>
           </div>
