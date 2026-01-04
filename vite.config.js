@@ -6,14 +6,16 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0',
-    open: false,
-    hmr: {
-      clientPort: 3000
-    },
+    // We keep these for your local development environment
     allowedHosts: [
-      '.manus.computer',
       'localhost',
       '127.0.0.1'
     ]
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    // Helps with large icon libraries like Lucide
+    chunkSizeWarningLimit: 1000, 
   }
 })
