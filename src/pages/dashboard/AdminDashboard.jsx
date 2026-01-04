@@ -175,7 +175,7 @@ export default function AdminDashboard() {
             <section>
               <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-400">Active Production</h2>
               <div className="space-y-4">
-                {orders.filter(o => o.status !== 'completed' && o.status !== 'pending').map(order => {
+                {orders.filter(o => o.status !== 'completed').map(order => {
                   const jobStatus = order.job_cards?.[0]?.status || 'assigned';
                   return (
                     <div key={order.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] border dark:border-gray-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
