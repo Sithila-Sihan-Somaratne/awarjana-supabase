@@ -104,6 +104,7 @@ export function AuthProvider({ children }) {
       } catch (err) {
         console.error("Auth initialization error:", err);
       } finally {
+        // CRITICAL FIX: Ensure loading is set to false even if errors occur
         if (mounted) setLoading(false);
       }
     };
@@ -115,11 +116,13 @@ export function AuthProvider({ children }) {
       
       if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') && session?.user) {
         await handleUserSession(session.user);
+        setLoading(false);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserRole(null);
         lastSyncedId.current = null;
         localStorage.clear();
+        setLoading(false);
       }
     });
 
@@ -184,6 +187,8 @@ export function AuthProvider({ children }) {
       setUserRole(null);
       lastSyncedId.current = null;
       localStorage.clear();
+      // Force loading to false on logout to ensure redirect can happen
+      setLoading(false);
     }
   };
 
@@ -264,7 +269,10 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {/* Don't block the children tree from rendering if we are in a signed-out state 
+        This prevents the white screen during the initial boot.
+      */}
+      {children}
     </AuthContext.Provider>
   );
 }

@@ -103,14 +103,15 @@ function MainLayout() {
 
 // App Routes Component
 function AppRoutes() {
-  const { loading } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
 
+  // Prevent white screen by showing a dedicated loading state while initializing
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading Session...</p>
         </div>
       </div>
     );
@@ -118,9 +119,9 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public Routes (No Header) */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+      {/* Public Routes (No Header) - Redirect to dashboard if already logged in */}
+      <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" replace />} />
+      <Route path="/signup" element={!isAuthenticated ? <Signup /> : <Navigate to="/dashboard" replace />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
