@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { 
   TrendingUp, Package, Clock, CheckCircle, 
-  RefreshCw, AlertCircle, Eye, Check, X, UserPlus, Database, Info, Key
+  RefreshCw, AlertCircle, Eye, Check, X, UserPlus, Database, Info, Key, CheckSquare
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -22,7 +22,7 @@ export default function AdminDashboard() {
       setLoading(true);
       setError(null);
 
-      // 1. Fetch Orders with Nested Job Cards
+      // 1. Fetch Orders with Nested Job Cards and properly linked workers
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
@@ -46,7 +46,7 @@ export default function AdminDashboard() {
       // 3. Fetch Employers (Workers)
       const { data: usersData } = await supabase.from('users').select('*').eq('role', 'employer');
 
-      // 4. Fetch Latest Registration Codes (using plain_code if available)
+      // 4. Fetch Registration Codes
       const { data: codesData } = await supabase
         .from('registration_codes')
         .select('*')
@@ -58,11 +58,10 @@ export default function AdminDashboard() {
       setEmployers(usersData || []);
       setCodes(codesData || []);
 
-      // Calculate Stats based on Order + Job Card status
       setStats({
         total: ordersData.length,
         pending: ordersData.filter(o => o.status === 'pending').length,
-        active: ordersData.filter(o => o.status !== 'completed' && o.status !== 'pending').length,
+        active: ordersData.filter(o => ['assigned', 'in_progress', 'review'].includes(o.status)).length,
         completed: ordersData.filter(o => o.status === 'completed').length
       });
     } catch (err) { 
@@ -77,21 +76,21 @@ export default function AdminDashboard() {
   const handleAssignWorker = async (orderId, employerId) => {
     if (!employerId) return;
     try {
-      // Update Order Table
+      // Update Order Table Master Status
       const { error: updateError } = await supabase
         .from('orders')
         .update({ status: 'assigned', assigned_employer_id: employerId })
         .eq('id', orderId);
       if (updateError) throw updateError;
 
-      // Create/Update Job Card Table
+      // Upsert Job Card (Syncs worker production status)
       const { error: jobCardError } = await supabase
         .from('job_cards')
         .upsert({ 
           order_id: orderId, 
           employer_id: employerId, 
           status: 'assigned' 
-        }, { onConflict: 'order_id' }); // Assuming one job card per order
+        }, { onConflict: 'order_id' });
       
       if (jobCardError) throw jobCardError;
 
@@ -105,9 +104,10 @@ export default function AdminDashboard() {
 
   const handleApproveDraft = async (draftId, orderId) => {
     try {
+      const now = new Date().toISOString();
       await supabase.from('drafts').update({ status: 'approved' }).eq('id', draftId);
-      await supabase.from('orders').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', orderId);
-      await supabase.from('job_cards').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('order_id', orderId);
+      await supabase.from('orders').update({ status: 'completed', completed_at: now }).eq('id', orderId);
+      await supabase.from('job_cards').update({ status: 'completed', completed_at: now }).eq('order_id', orderId);
       fetchData();
     } catch (err) { alert(err.message); }
   };
@@ -137,13 +137,11 @@ export default function AdminDashboard() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <div>
             <h1 className="text-4xl font-black dark:text-white uppercase tracking-tighter">Supervisor Hub</h1>
-            <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Production Management 2026</p>
+            <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Awarjana Production 2026</p>
           </div>
-          <div className="flex gap-3">
-            <button onClick={() => navigate('/admin/inventory')} className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl shadow-sm border dark:border-gray-800 font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all">
-              <Database size={16} /> Inventory
-            </button>
-          </div>
+          <button onClick={() => navigate('/admin/inventory')} className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl shadow-sm border dark:border-gray-800 font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all">
+            <Database size={16} /> Inventory
+          </button>
         </header>
 
         {/* Stats Grid */}
@@ -165,7 +163,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             
-            {/* 1. Pending Approvals Section */}
+            {/* 1. Pending Approvals */}
             {pendingDrafts.length > 0 && (
               <section>
                 <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-amber-500 flex items-center gap-2">
@@ -175,16 +173,12 @@ export default function AdminDashboard() {
                   {pendingDrafts.map(draft => (
                     <div key={draft.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border-2 border-amber-100 shadow-sm flex justify-between items-center">
                       <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden">
+                        <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden border">
                           <img src={draft.draft_url} className="w-full h-full object-cover" alt="Draft" />
                         </div>
                         <div>
                           <p className="text-xs font-black text-indigo-600 uppercase">{draft.order?.order_number}</p>
                           <p className="font-bold dark:text-white">{draft.order?.title}</p>
-                          <div className="flex gap-2 mt-1">
-                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${getPriorityColor(draft.order?.priority)}`}>{draft.order?.priority}</span>
-                            <span className="text-[10px] font-bold text-gray-500 uppercase">Rs. {draft.order?.cost}</span>
-                          </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -198,7 +192,7 @@ export default function AdminDashboard() {
               </section>
             )}
 
-            {/* 2. Active Orders Section (Using Job Card Status) */}
+            {/* 2. Active Production */}
             <section>
               <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-400">Active Production</h2>
               <div className="space-y-4">
@@ -212,11 +206,9 @@ export default function AdminDashboard() {
                           <p className="text-xs font-black text-indigo-600 uppercase">{order.order_number}</p>
                           <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${getPriorityColor(order.priority)}`}>{order.priority}</span>
                         </div>
-                        <p className="font-bold dark:text-white">{order.title || 'Custom Project'}</p>
-                        
+                        <p className="font-bold dark:text-white">{order.title}</p>
                         <div className="flex flex-col gap-1 mt-3">
                           <div className="flex items-center gap-2">
-                            {/* STATUS CHIP - NOW FROM JOB CARDS */}
                             <span className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase ${
                               jobStatus === 'in_progress' ? 'bg-blue-100 text-blue-600' : 
                               jobStatus === 'assigned' ? 'bg-purple-100 text-purple-600' : 
@@ -225,8 +217,8 @@ export default function AdminDashboard() {
                               {jobStatus.replace('_', ' ')}
                             </span>
                             {order.employer && (
-                              <span className="text-[8px] font-black text-purple-600 uppercase tracking-tighter">
-                                👤 {order.employer.full_name || order.employer.email}
+                              <span className="text-[8px] font-black text-purple-600 uppercase tracking-tighter bg-purple-50 px-2 py-0.5 rounded">
+                                Assigned to: {order.employer.full_name}
                               </span>
                             )}
                           </div>
@@ -245,9 +237,9 @@ export default function AdminDashboard() {
                           onChange={(e) => handleAssignWorker(order.id, e.target.value)} 
                           className="p-3 bg-gray-50 dark:bg-gray-800 dark:text-white rounded-xl border-none text-[10px] font-black uppercase outline-none focus:ring-2 ring-indigo-500"
                         >
-                          <option value="">{order.assigned_employer_id ? 'Change Worker' : 'Assign Worker'}</option>
+                          <option value="">{order.assigned_employer_id ? 'Reassign' : 'Assign Worker'}</option>
                           {employers.map(emp => (
-                            <option key={emp.id} value={emp.id}>{emp.full_name || emp.email}</option>
+                            <option key={emp.id} value={emp.id}>{emp.full_name}</option>
                           ))}
                         </select>
                       </div>
@@ -256,9 +248,33 @@ export default function AdminDashboard() {
                 })}
               </div>
             </section>
+
+            {/* 3. Completed Production Section */}
+            <section className="mt-12">
+              <h2 className="text-xl font-black uppercase tracking-tight mb-6 text-green-500 flex items-center gap-2">
+                <CheckSquare size={20} /> Recently Completed
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {orders.filter(o => o.status === 'completed').slice(0, 6).map(order => (
+                  <div key={order.id} className="bg-white dark:bg-gray-900 p-5 rounded-[2rem] border dark:border-gray-800 shadow-sm">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <p className="text-[10px] font-black text-indigo-500 uppercase">{order.order_number}</p>
+                        <p className="font-bold dark:text-white text-sm">{order.title}</p>
+                      </div>
+                      <div className="bg-green-50 text-green-600 p-2 rounded-full"><Check size={14} /></div>
+                    </div>
+                    <div className="flex justify-between items-center pt-4 border-t dark:border-gray-800">
+                       <p className="text-[9px] font-black text-gray-400 uppercase">Finished by: {order.employer?.full_name || 'System'}</p>
+                       <p className="text-[10px] font-black dark:text-white">Rs. {order.cost}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
 
-          {/* Sidebar: Codes */}
+          {/* Sidebar */}
           <div className="space-y-8">
             <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border dark:border-gray-800 shadow-sm">
               <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
@@ -267,9 +283,7 @@ export default function AdminDashboard() {
               <div className="space-y-3">
                 {codes.map(c => (
                   <div key={c.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border dark:border-gray-700">
-                    <p className="text-xs font-mono font-black text-indigo-600 truncate">
-                      {c.plain_code || 'HIDDEN HASH'}
-                    </p>
+                    <p className="text-xs font-mono font-black text-indigo-600 truncate">{c.plain_code || 'HIDDEN'}</p>
                     <div className="flex justify-between items-center mt-1">
                       <p className="text-[10px] text-gray-500 uppercase font-bold">{c.role}</p>
                       {c.used && <CheckCircle size={12} className="text-green-500" />}
@@ -278,7 +292,7 @@ export default function AdminDashboard() {
                 ))}
               </div>
               <button onClick={() => navigate('/admin/codes')} className="w-full mt-6 py-4 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all">
-                Manage All Codes
+                Manage Codes
               </button>
             </div>
           </div>
@@ -291,7 +305,7 @@ export default function AdminDashboard() {
           <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl">
             <div className="p-8 border-b dark:border-gray-800 flex justify-between items-center">
               <div>
-                <p className="text-xs font-black text-indigo-600 uppercase tracking-widest">{selectedOrder.order_number}</p>
+                <p className="text-xs font-black text-indigo-600 uppercase">{selectedOrder.order_number}</p>
                 <h2 className="text-2xl font-black dark:text-white uppercase tracking-tighter">{selectedOrder.title}</h2>
               </div>
               <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all">
@@ -320,7 +334,6 @@ export default function AdminDashboard() {
                       <span className="text-indigo-600 font-black">x{m.quantity}</span>
                     </div>
                   ))}
-                  {(!selectedOrder.materials || selectedOrder.materials.length === 0) && <p className="text-gray-500 italic">No materials specified.</p>}
                 </div>
               </div>
             </div>
@@ -334,7 +347,7 @@ export default function AdminDashboard() {
                   className="p-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl border-none text-xs font-bold outline-none shadow-sm"
                 >
                   <option value="">Assign Worker...</option>
-                  {employers.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name || emp.email}</option>)}
+                  {employers.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name}</option>)}
                 </select>
               </div>
               <p className="text-xl font-black dark:text-white">Rs. {selectedOrder.cost}</p>
