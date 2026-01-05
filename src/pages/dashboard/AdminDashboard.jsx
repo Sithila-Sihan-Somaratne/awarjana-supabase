@@ -158,6 +158,14 @@ export default function AdminDashboard() {
           <button onClick={fetchData} className="p-4 bg-white dark:bg-gray-900 border dark:border-gray-800 rounded-2xl shadow-sm hover:rotate-180 transition-all duration-500">
             <RefreshCw size={20} className="dark:text-white" />
           </button>
+          <button
+            onClick={() => navigate("/admin/inventory")}
+            className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl shadow-sm border dark:border-gray-800 font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-colors"
+          >
+            <Database size={16} /> Inventory
+          <button onClick={fetchData} className="p-4 bg-white dark:bg-gray-900 border dark:border-gray-800 rounded-2xl shadow-sm hover:rotate-180 transition-all duration-500">
+            <RefreshCw size={20} className="dark:text-white" />
+          </button>
         </header>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
