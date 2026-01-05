@@ -1,4 +1,3 @@
-// src/pages/customer/CustomerDashboard.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,11 +19,17 @@ export default function CustomerDashboard() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('orders').select('*').eq('customer_id', user.id).order('created_at', { ascending: false });
+        .from('orders')
+        .select(`
+          *,
+          customer:users!orders_customer_id_fkey(full_name, email),
+          employer:users!orders_assigned_employer_id_fkey(full_name, email)
+        `)
+        .eq('customer_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       const validData = data || [];
-      
       const totalValue = validData.reduce((sum, o) => sum + (parseFloat(o.total_amount) || parseFloat(o.cost) || 0), 0);
 
       setStats({
@@ -79,7 +84,7 @@ export default function CustomerDashboard() {
           <div className="flex p-4 bg-gray-50/50 dark:bg-gray-800/50 border-b dark:border-gray-700 gap-2">
             {['all', 'active', 'completed'].map(t => (
               <button key={t} onClick={() => setActiveTab(t)} 
-                className={`px-6 py-2 rounded-xl capitalize font-black text-xs transition-all ${activeTab === t ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-white' : 'text-gray-400 hover:text-gray-200'}`}
+                className={`px-6 py-2 rounded-xl capitalize font-black text-xs transition-all ${activeTab === t ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-white' : 'text-gray-400 hover:text-gray-500'}`}
               >
                 {t}
               </button>

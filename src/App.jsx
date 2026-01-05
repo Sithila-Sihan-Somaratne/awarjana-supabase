@@ -174,7 +174,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/employer/job-cards"
+          path="/employer/job-cards/:id"
           element={
             <ProtectedRoute requiredRole="employer">
               <JobCardView />
@@ -190,7 +190,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/employer/drafts/submit/:orderId"
+          path="/employer/submit-draft/:orderId"
           element={
             <ProtectedRoute requiredRole="employer">
               <SubmitDraft />

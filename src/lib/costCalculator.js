@@ -1,10 +1,16 @@
 /**
- * Material prices/constants in LKR based on industry standards in Sri Lanka
+ * Material prices/constants in LKR based on your inventory data.
+ * Units converted from "piece" cost to "sq inch" cost assuming 
+ * standard sheet sizes (Glass: 4x3ft, MDF: 8x4ft).
  */
 export const MATERIAL_PRICES = {
-  GLASS_PER_SQ_INCH: 1350.0 / (48 * 36), 
-  MDF_PER_SQ_INCH: 1380.0 / (96 * 48),
+  // Glass (id: 2) cost 300.00
+  GLASS_PER_SQ_INCH: 300.0 / (48 * 36), 
+  // MDF (id: 3) cost 115.00
+  MDF_PER_SQ_INCH: 115.0 / (96 * 48),
+  // Hardware: Stand (50) + Hook (10) + Under Pin (20) + Side Pin (10)
   FIXED_SUPPLIES: 50.0 + 10.0 + 20.0 + 10.0, 
+  // Labor/Utility: Wages (100) + Electricity (50)
   LABOR_BASE: 100.0 + 50.0, 
 };
 

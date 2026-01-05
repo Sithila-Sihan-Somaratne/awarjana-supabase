@@ -28,8 +28,8 @@ export default function PublicOrderTracker() {
         .from('orders')
         .select(`
           *,
-          customer:users!orders_customer_id_fkey(email, full_name),
-          employer:users!orders_assigned_employer_id_fkey(full_name)
+          customer:users!customer_id(email, full_name),
+          employer:users!assigned_employer_id(full_name)
         `)
         .eq('order_number', number.toUpperCase().trim())
         .maybeSingle();

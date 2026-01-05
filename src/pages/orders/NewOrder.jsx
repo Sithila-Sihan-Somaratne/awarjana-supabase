@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
-  ArrowLeft, Ruler, Layers, FileText, 
+  ArrowLeft, Ruler, FileText, 
   Loader, Calendar, Clock, TrendingUp, 
   CheckCircle2, Zap, Info
 } from 'lucide-react';
@@ -42,7 +42,7 @@ export default function NewOrder() {
   const deadlineOptions = getDeadlineOptions();
   const priorityOptions = getPriorityOptions();
 
-  // 1. Fetch Materials
+  // 1. Fetch Materials and Initial Selection
   useEffect(() => {
     async function fetchInventory() {
       try {
@@ -55,8 +55,11 @@ export default function NewOrder() {
         if (fetchError) throw fetchError;
         
         setMaterials(data || []);
-        if (data?.length > 0) {
-          setFormData(prev => ({ ...prev, materialId: data[0].id.toString() }));
+        
+        // Default to the first 'frames' category item
+        const firstFrame = data?.find(m => m.category === 'frames');
+        if (firstFrame) {
+          setFormData(prev => ({ ...prev, materialId: firstFrame.id.toString() }));
         }
       } catch (err) {
         setError("Failed to sync inventory.");
@@ -88,27 +91,28 @@ export default function NewOrder() {
     }
   }, [formData, materials]);
 
+  const frameOptions = materials.filter(m => m.category === 'frames');
   const selectedMaterial = materials.find(m => m.id.toString() === formData.materialId);
 
   // 3. Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (pricing.total <= 0) return setError("Please enter valid dimensions.");
+    
+    // Validation for Custom Date
     if (formData.deadlineType === 'custom' && !formData.customDate) {
         return setError("Please select a custom production date.");
     }
-    
+
     const wNum = parseFloat(formData.width);
     const hNum = parseFloat(formData.height);
-    const usageAmount = (wNum + hNum) * 2 / 108; 
+    const usageAmount = (wNum + hNum) * 2; 
 
     if (selectedMaterial && selectedMaterial.stock_quantity < usageAmount) {
-      return setError(`Stock Alert! Only ${selectedMaterial.stock_quantity.toFixed(1)} units left.`);
+      return setError(`Stock Alert! Only ${selectedMaterial.stock_quantity.toFixed(1)} inches left.`);
     }
 
     setLoading(true);
-    setError(null);
-
     try {
       let finalDeadline = formData.customDate;
       if (formData.deadlineType === 'standard') {
@@ -117,13 +121,12 @@ export default function NewOrder() {
           finalDeadline = date.toISOString();
       } else if (formData.deadlineType === 'express') {
           const date = new Date();
-          date.setDate(date.getDate() + 2);
+          date.setDate(date.getDate() + 3);
           finalDeadline = date.toISOString();
       }
 
       const orderNumber = `ORD-${Math.random().toString(36).toUpperCase().substring(2, 9)}`;
       
-      // Step A: Create the Order (Using all columns expected by your Dashboards)
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
@@ -131,35 +134,27 @@ export default function NewOrder() {
           customer_id: user.id,
           status: 'pending',
           priority: formData.priority,
-          cost: Math.round(pricing.total),
-          total_amount: Math.round(pricing.total), // Fixed for Dashboards
+          total_amount: Math.round(pricing.total),
           width: wNum,
           height: hNum,
-          dimensions: `${wNum}x${hNum}`,           // Fixed for Dashboards
-          title: formData.title || "Untitled",      // Fixed for Dashboards
+          dimensions: `${wNum}x${hNum}`,
+          title: formData.title || "Untitled",
           customer_notes: formData.notes,
-          admin_notes: formData.title,
           deadline_date: finalDeadline,
           production_type: formData.deadlineType
         }])
-        .select()
-        .single();
+        .select().single();
 
       if (orderError) throw orderError;
 
-      // Step B: Link Materials (Usage is now numeric/decimal)
-      const { error: junctionError } = await supabase
-        .from('order_materials')
-        .insert([{
-          order_id: order.id,
-          material_id: selectedMaterial.id,
-          quantity: usageAmount,
-          cost_at_time: selectedMaterial.cost
-        }]);
+      // Link Material & Deduct Stock
+      await supabase.from('order_materials').insert([{
+        order_id: order.id,
+        material_id: selectedMaterial.id,
+        quantity: usageAmount,
+        cost_at_time: selectedMaterial.cost
+      }]);
 
-      if (junctionError) throw junctionError;
-
-      // Step C: Deduct Stock
       await supabase.from('materials')
         .update({ stock_quantity: selectedMaterial.stock_quantity - usageAmount })
         .eq('id', selectedMaterial.id);
@@ -173,7 +168,7 @@ export default function NewOrder() {
     }
   };
 
-  if (fetching) return <div className="p-20 text-center font-black animate-pulse dark:text-white">SYNCING INVENTORY...</div>;
+  if (fetching) return <div className="p-20 text-center font-black animate-pulse dark:text-white uppercase tracking-widest">Syncing Inventory...</div>;
 
   if (isSuccess) {
     return (
@@ -197,12 +192,13 @@ export default function NewOrder() {
           <div className="lg:col-span-2 space-y-6">
             <header>
               <h1 className="text-5xl font-black dark:text-white uppercase tracking-tighter">Order Configurator</h1>
-              <p className="text-gray-500 font-bold text-xs uppercase tracking-[0.3em] mt-1">Custom Production v2026</p>
+              <p className="text-gray-500 font-bold text-xs uppercase tracking-[0.3em] mt-1">LKR Pricing Engine v2026</p>
             </header>
 
             {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
 
             <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-[3rem] p-8 md:p-10 border dark:border-gray-800 shadow-sm space-y-8">
+              {/* Project Title */}
               <div className="space-y-4">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Project Name</label>
                 <div className="relative">
@@ -216,6 +212,7 @@ export default function NewOrder() {
                 </div>
               </div>
 
+              {/* Dimensions */}
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
@@ -241,74 +238,18 @@ export default function NewOrder() {
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4 border-t dark:border-gray-800">
-                <label className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-2">
-                  <Clock size={14}/> Production Speed
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {deadlineOptions.map(opt => (
-                    <button 
-                      key={opt.id} type="button" 
-                      onClick={() => setFormData({...formData, deadlineType: opt.id})}
-                      className={`p-4 rounded-2xl border-2 text-left transition-all ${
-                        formData.deadlineType === opt.id 
-                          ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/40' 
-                          : 'border-gray-50 dark:border-gray-700 opacity-60'
-                      }`}
-                    >
-                      <p className="font-black text-xs dark:text-white">{opt.label}</p>
-                      <p className="text-[9px] text-gray-400 uppercase font-bold">{opt.multiplier}x priority</p>
-                    </button>
-                  ))}
-                </div>
-
-                {formData.deadlineType === 'custom' && (
-                  <div className="mt-4 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Select Custom Deadline</label>
-                    <div className="relative mt-2">
-                      <Calendar className="absolute left-4 top-4 text-blue-500" size={18}/>
-                      <input 
-                        type="date" required
-                        min={new Date().toISOString().split('T')[0]}
-                        className="w-full pl-12 p-4 bg-blue-50 dark:bg-gray-900 rounded-2xl dark:text-white font-bold outline-none border-2 border-blue-200 dark:border-blue-900"
-                        value={formData.customDate}
-                        onChange={e => setFormData({...formData, customDate: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1 flex items-center gap-2">
-                  <Zap size={14} className="text-yellow-500" /> Workload Priority
-                </label>
-                <div className="grid grid-cols-4 gap-2 p-1 bg-gray-50 dark:bg-gray-800 rounded-2xl">
-                  {priorityOptions.map((opt) => (
-                    <button key={opt.id} type="button" onClick={() => setFormData({ ...formData, priority: opt.id })}
-                      className={`py-3 rounded-xl text-[10px] font-black uppercase transition-all ${
-                        formData.priority === opt.id 
-                          ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm' 
-                          : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                    >
-                      {opt.id}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
+              {/* Material Selection */}
               <div className="space-y-4">
                 <div className="flex justify-between items-end px-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Material Choice</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Moulding Choice</label>
                   {selectedMaterial && (
-                    <span className={`text-[10px] font-bold ${selectedMaterial.stock_quantity > 5 ? 'text-green-500' : 'text-red-500'}`}>
-                       {selectedMaterial.stock_quantity.toFixed(1)} units in stock
+                    <span className={`text-[10px] font-bold ${selectedMaterial.stock_quantity > 20 ? 'text-green-500' : 'text-red-500'}`}>
+                       {selectedMaterial.stock_quantity.toFixed(1)} inches available
                     </span>
                   )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {materials.map(m => (
+                  {frameOptions.map(m => (
                     <button
                       key={m.id} type="button"
                       disabled={m.stock_quantity <= 0}
@@ -326,27 +267,80 @@ export default function NewOrder() {
                 </div>
               </div>
 
+              {/* Speed & Priority */}
+              <div className="space-y-6 pt-4 border-t dark:border-gray-800">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-2"><Clock size={14}/> Production Speed</label>
+                    <select 
+                        value={formData.deadlineType}
+                        onChange={e => setFormData({...formData, deadlineType: e.target.value})}
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border-none font-bold dark:text-white focus:ring-2 focus:ring-blue-500"
+                    >
+                        {deadlineOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.label} ({opt.multiplier}x)</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-2"><Zap size={14} className="text-yellow-500"/> Workload Priority</label>
+                    <div className="flex gap-2 p-1 bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                        {priorityOptions.map(opt => (
+                            <button 
+                                key={opt.id} type="button"
+                                onClick={() => setFormData({...formData, priority: opt.id})}
+                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${formData.priority === opt.id ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                {opt.id}
+                            </button>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Custom Date Picker - Conditional */}
+                {formData.deadlineType === 'custom' && (
+                  <div className="animate-in fade-in slide-in-from-top-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Select Custom Deadline</label>
+                    <div className="relative mt-2">
+                      <Calendar className="absolute left-4 top-4 text-blue-500" size={18}/>
+                      <input 
+                        type="date" required
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full pl-12 p-4 bg-blue-50 dark:bg-gray-900 rounded-2xl dark:text-white font-bold outline-none border-2 border-blue-200 dark:border-blue-900"
+                        value={formData.customDate}
+                        onChange={e => setFormData({...formData, customDate: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button 
                 type="submit" disabled={loading || pricing.total === 0}
                 className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50 uppercase"
               >
-                {loading ? <Loader className="animate-spin" /> : <><CheckCircle2 /> Submit Order</>}
+                {loading ? <Loader className="animate-spin" /> : <><CheckCircle2 /> Confirm & Publish</>}
               </button>
             </form>
           </div>
 
+          {/* Sidebar Costing */}
           <div className="lg:col-start-3">
             <div className="sticky top-8 bg-white dark:bg-gray-900 rounded-[3rem] p-8 border dark:border-gray-800 shadow-sm">
               <h2 className="text-xl font-black dark:text-white uppercase mb-6 flex items-center gap-2">
-                <TrendingUp className="text-blue-600" size={20}/> Cost Breakdown
+                <TrendingUp className="text-blue-600" size={20}/> Costing
               </h2>
               <div className="space-y-4">
                 <div className="flex justify-between text-xs font-bold">
-                  <span className="text-gray-400 uppercase">Moulding & Base</span>
-                  <span className="dark:text-white">{formatLKR(pricing.breakdown?.frame || pricing.breakdown?.materials || 0)}</span>
+                  <span className="text-gray-400 uppercase">Moulding</span>
+                  <span className="dark:text-white">{formatLKR(pricing.breakdown?.frame || 0)}</span>
                 </div>
                 <div className="flex justify-between text-xs font-bold">
-                  <span className="text-gray-400 uppercase">Labor & Supplies</span>
+                  <span className="text-gray-400 uppercase">Glass & Backing</span>
+                  <span className="dark:text-white">{formatLKR((pricing.breakdown?.glass || 0) + (pricing.breakdown?.mdf || 0))}</span>
+                </div>
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-gray-400 uppercase">Labor & Ops</span>
                   <span className="dark:text-white">{formatLKR(pricing.breakdown?.labor || 0)}</span>
                 </div>
                 
@@ -358,7 +352,7 @@ export default function NewOrder() {
                 </div>
 
                 <div className="pt-4 border-t-2 border-gray-100 dark:border-gray-800">
-                  <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Grand Total (LKR)</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Final (LKR)</p>
                   <p className={`text-4xl font-black ${pricing.isDiscounted ? 'text-green-500' : 'text-blue-600'}`}>
                     {formatLKR(pricing.total)}
                   </p>
@@ -368,7 +362,7 @@ export default function NewOrder() {
               <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl flex items-start gap-3">
                 <Info size={16} className="text-blue-500 mt-1 shrink-0" />
                 <p className="text-[9px] leading-relaxed text-gray-500 font-medium italic">
-                  Estimates are based on live inventory costs and workload density.
+                  Estimates include current linear inch material costs and chosen production velocity.
                 </p>
               </div>
             </div>
