@@ -3,11 +3,10 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
-import { ToastProvider, useToast } from './components/ui/Toast';
+import { ToastProvider } from './components/ui/Toast';
 import { GlobalThemeToggle } from './components/GlobalThemeToggle';
-import { BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 // Pages
@@ -43,12 +42,13 @@ import UserManagement from './pages/admin/UserManagement';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 
-
-// Main Layout Component
+/**
+ * Main Layout Component
+ * Handles the persistent header and page padding
+ */
 function MainLayout() {
   const { user, userRole, logout } = useAuth();
   const location = useLocation();
-  const { toast } = useToast();
 
   // Don't show header on auth pages
   const hideHeader = ['/login', '/signup', '/forgot-password', '/reset-password'].includes(location.pathname);
@@ -76,12 +76,10 @@ function MainLayout() {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* User Info */}
               <div className="hidden md:block text-sm text-gray-600 dark:text-gray-400">
                 {user?.email}
               </div>
 
-              {/* Logout Button */}
               <button
                 onClick={logout}
                 className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg transition-colors"
@@ -101,29 +99,52 @@ function MainLayout() {
   );
 }
 
-// App Routes Component
+/**
+ * App Routes Component
+ * Defines the routing structure and access control
+ */
 function AppRoutes() {
   const { loading, isAuthenticated } = useAuth();
+  const location = useLocation();
 
-  // Prevent white screen by showing a dedicated loading state while initializing
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading Session...</p>
+          <p className="text-gray-600 dark:text-gray-400 font-medium">Loading Session...</p>
         </div>
       </div>
     );
   }
 
+  /**
+   * CRITICAL FIX FOR PASSWORD RESET:
+   * When a user verifies OTP, Supabase signs them in.
+   * We must block the "Auto-redirect to Dashboard" if they are currently on /reset-password,
+   * otherwise the ResetPassword component unmounts before it can save the new password.
+   */
+  const isResetting = location.pathname === '/reset-password';
+
   return (
     <Routes>
-      {/* Public Routes (No Header) - Redirect to dashboard if already logged in */}
-      <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" replace />} />
-      <Route path="/signup" element={!isAuthenticated ? <Signup /> : <Navigate to="/dashboard" replace />} />
+      {/* Public Routes */}
+      <Route 
+        path="/login" 
+        element={isAuthenticated && !isResetting ? <Navigate to="/dashboard" replace /> : <Login />} 
+      />
+      <Route 
+        path="/signup" 
+        element={isAuthenticated && !isResetting ? <Navigate to="/dashboard" replace /> : <Signup />} 
+      />
+      
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      
+      {/* Reset Password must remain accessible even when 'isAuthenticated' becomes true 
+          during the OTP flow.
+      */}
       <Route path="/reset-password" element={<ResetPassword />} />
+      
       <Route path="/unauthorized" element={<Unauthorized />} />
 
       {/* Protected Routes with Layout */}
@@ -134,7 +155,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        {/* Main Dashboard Route */}
         <Route path="/dashboard" element={<MainDashboard />} />
 
         {/* Customer Routes */}
@@ -240,25 +260,22 @@ function AppRoutes() {
           }
         />
 
-        {/* Common Routes */}
+        {/* Profile & Settings */}
         <Route path="/profile" element={<Profile />} />
         <Route path="/settings" element={<Settings />} />
-
       </Route>
 
-      {/* Redirects */}
+      {/* Fallback Redirects */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }
 
-// Main App Component
+/**
+ * Root App Component
+ */
 function App() {
-  console.log('🚀 [APP] Initializing Awarjana Creations App...');
-  console.log('📦 [APP] Environment:', import.meta.env.DEV ? 'Development' : 'Production');
-  console.log('🔗 [APP] Supabase URL:', import.meta.env.VITE_SUPABASE_URL ? 'Configured' : 'Not Set');
-
   return (
     <Router>
       <ThemeProvider>
@@ -266,8 +283,6 @@ function App() {
           <ToastProvider>
             <div className="relative min-h-screen">
               <AppRoutes />
-
-              {/* Global Floating Theme Toggle */}
               <GlobalThemeToggle />
             </div>
           </ToastProvider>

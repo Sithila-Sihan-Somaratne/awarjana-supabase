@@ -54,7 +54,7 @@ export default function JobCardView() {
       if (data) {
         setJobCard(data);
         
-        // Calculate initial display time: saved time + (now - started_at if running)
+        // Calculate initial display time: saved time + (now - started_at if currently running)
         let initialSeconds = Math.floor((data.total_time_ms || 0) / 1000);
         
         if (data.status === 'in_progress' && !data.is_paused && data.started_at) {
@@ -103,7 +103,7 @@ export default function JobCardView() {
         
         if (jcErr) throw jcErr;
 
-        // Sync order status
+        // Sync order status to in_progress
         await supabase.from('orders').update({ status: 'in_progress' }).eq('id', jobCard.order_id);
 
         setIsTimerRunning(true);
@@ -119,7 +119,8 @@ export default function JobCardView() {
 
         const { error: jcErr } = await supabase.from('job_cards').update({ 
           is_paused: true, 
-          total_time_ms: totalMs 
+          total_time_ms: totalMs,
+          started_at: null // Reset start for next session
         }).eq('id', id);
 
         if (jcErr) throw jcErr;
@@ -145,7 +146,7 @@ export default function JobCardView() {
   };
 
   if (loading) return <LoadingSpinner />;
-  if (!jobCard) return <div className="p-20 text-center dark:text-white">Job Card not found.</div>;
+  if (!jobCard) return <div className="p-20 text-center dark:text-white font-black uppercase">Job Card not found.</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black p-4 md:p-8 transition-colors duration-300">
@@ -181,15 +182,15 @@ export default function JobCardView() {
           ))}
         </div>
 
-        {/* STEP 1: PRODUCTION TIMER (ERP MODE) */}
+        {/* STEP 1: PRODUCTION TIMER */}
         {activeStep === 1 && (
-          <div className="bg-white dark:bg-gray-900 rounded-[3rem] p-12 shadow-xl border dark:border-gray-800 text-center">
+          <div className="bg-white dark:bg-gray-900 rounded-[3rem] p-8 md:p-12 shadow-xl border dark:border-gray-800 text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full mb-6">
               <Info size={14} />
               <span className="text-[10px] font-black uppercase">Production Tracking Active</span>
             </div>
             
-            <h2 className="text-7xl font-black dark:text-white mb-10 font-mono tracking-tighter italic">
+            <h2 className="text-6xl md:text-8xl font-black dark:text-white mb-10 font-mono tracking-tighter italic">
               {formatTime(seconds)}
             </h2>
             
@@ -197,8 +198,8 @@ export default function JobCardView() {
               onClick={handleToggleTimer}
               className={`flex items-center gap-4 px-12 py-6 rounded-3xl font-black uppercase tracking-widest mx-auto transition-all active:scale-95 ${
                 isTimerRunning 
-                  ? 'bg-amber-100 text-amber-600' 
-                  : 'bg-green-100 text-green-600 hover:shadow-lg hover:shadow-green-100'
+                  ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' 
+                  : 'bg-green-100 text-green-600 hover:bg-green-200 hover:shadow-lg hover:shadow-green-100/50'
               }`}
             >
               {isTimerRunning ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
@@ -216,7 +217,7 @@ export default function JobCardView() {
                </div>
                <div>
                   <h3 className="text-xl font-black dark:text-white uppercase">Resource Inventory</h3>
-                  <p className="text-gray-500 text-sm font-bold">Log used materials (Frame, Glass, Plywood) to keep stock levels accurate.</p>
+                  <p className="text-gray-500 text-sm font-bold">Log used materials (Frames, Glass, Sheets) to keep ERP stock levels accurate.</p>
                </div>
             </div>
             <button 
@@ -235,7 +236,7 @@ export default function JobCardView() {
               <CheckCircle size={32} />
             </div>
             <h3 className="text-xl font-black dark:text-white uppercase mb-2">Final Quality Check</h3>
-            <p className="text-gray-500 text-xs font-black uppercase mb-8 tracking-widest">Upload high-res proofs of the finished item</p>
+            <p className="text-gray-500 text-xs font-black uppercase mb-8 tracking-widest">Upload high-res proofs of the finished item for review</p>
             
             <button 
               onClick={() => navigate(`/employer/submit-draft/${jobCard.order_id}?jobCard=${id}`)}
@@ -250,19 +251,18 @@ export default function JobCardView() {
         {/* BOTTOM SPECIFICATION GRID */}
         <div className="mt-8 grid grid-cols-2 gap-4">
            <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border dark:border-gray-800">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Order Title</p>
+              <p className="text-sm font-black dark:text-white uppercase truncate">
+                {jobCard.order?.title || 'No Title'}
+              </p>
+           </div>
+           <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border dark:border-gray-800">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Dimensions</p>
               <p className="text-lg font-bold dark:text-white">
                 {jobCard.order?.width || 'N/A'} x {jobCard.order?.height || 'N/A'}
               </p>
            </div>
-           <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border dark:border-gray-800">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Production Target</p>
-              <p className="text-lg font-bold text-red-500 uppercase italic">
-                {jobCard.order?.priority || 'MEDIUM'}
-              </p>
-           </div>
         </div>
-
       </div>
     </div>
   );
