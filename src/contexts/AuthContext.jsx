@@ -77,7 +77,6 @@ export function AuthProvider({ children }) {
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // FIX: Prevent automatic sync/redirect during recovery
       if (event === 'PASSWORD_RECOVERY') {
         setLoading(false);
         return; 
@@ -99,6 +98,62 @@ export function AuthProvider({ children }) {
       subscription?.unsubscribe();
     };
   }, [handleUserSession]);
+
+  // --- NEW SIGNUP LOGIC ---
+  const requestSignupOTP = async (email, password, role, registrationCode = null) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.toLowerCase().trim(),
+        password,
+        options: {
+          data: { 
+            role: role,
+            registration_code: registrationCode 
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      setPendingVerification({ email, role });
+      return { success: true, message: "Verification code sent! Please check your email." };
+    } catch (err) {
+      return { success: false, error: formatErrorMessage(err) };
+    }
+  };
+
+  const verifySignupOTP = async (email, token) => {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.toLowerCase().trim(),
+        token,
+        type: "signup",
+      });
+      if (error) throw error;
+      if (data.user) {
+        await supabase.from("users").update({ email_verified: true }).eq("id", data.user.id);
+        await handleUserSession(data.user);
+      }
+      setPendingVerification(null);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: formatErrorMessage(err) };
+    }
+  };
+
+  const resendSignupOTP = async (email) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.toLowerCase().trim(),
+      });
+      if (error) throw error;
+      return { success: true, message: "New verification code sent!" };
+    } catch (err) {
+      return { success: false, error: formatErrorMessage(err) };
+    }
+  };
+  // ------------------------
 
   const login = async (email, password) => {
     try {
@@ -128,6 +183,16 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const forgotPassword = async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim());
+      if (error) throw error;
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: formatErrorMessage(err) };
+    }
+  };
+
   const verifyResetOTP = async (email, token) => {
     try {
       const { error } = await supabase.auth.verifyOtp({
@@ -135,34 +200,6 @@ export function AuthProvider({ children }) {
         token,
         type: "recovery",
       });
-      if (error) throw error;
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: formatErrorMessage(err) };
-    }
-  };
-
-  const verifySignupOTP = async (email, token) => {
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: email.toLowerCase().trim(),
-        token,
-        type: "signup",
-      });
-      if (error) throw error;
-      if (data.user) {
-        await supabase.from("users").update({ email_verified: true }).eq("id", data.user.id);
-        await handleUserSession(data.user);
-      }
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: formatErrorMessage(err) };
-    }
-  };
-
-  const forgotPassword = async (email) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim());
       if (error) throw error;
       return { success: true };
     } catch (err) {
@@ -181,8 +218,19 @@ export function AuthProvider({ children }) {
   }
 
   const value = {
-    user, userRole, loading, error, login, logout,
-    verifySignupOTP, verifyResetOTP, forgotPassword, resetPassword,
+    user,
+    userRole,
+    loading,
+    error,
+    login,
+    logout,
+    requestSignupOTP,
+    verifySignupOTP,
+    resendSignupOTP,
+    pendingVerification,
+    forgotPassword,
+    resetPassword,
+    verifyResetOTP,
     isAuthenticated: !!user,
   };
 
