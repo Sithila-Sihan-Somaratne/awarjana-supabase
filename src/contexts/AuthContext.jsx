@@ -33,17 +33,21 @@ export function AuthProvider({ children }) {
       lastSyncedId.current = null;
       return;
     }
+
     setUser(authUser);
     const jwtRole = authUser.app_metadata?.role;
     if (jwtRole) setUserRole(jwtRole);
+    
+    // Prevent redundant DB calls if already synced
     if (lastSyncedId.current === authUser.id) return;
 
     try {
-      const { data, error: uErr } = await supabase
+      const { data } = await supabase
         .from("users")
         .select("role, email_verified")
         .eq("id", authUser.id)
         .maybeSingle();
+      
       if (data) {
         setUserRole(data.role || jwtRole || "customer");
         lastSyncedId.current = authUser.id;
@@ -59,10 +63,14 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let mounted = true;
+
     const initAuth = async () => {
       try {
+        // 1. Check for existing session
         const { data: { session } } = await supabase.auth.getSession();
+        
         if (session?.user && mounted) {
+          // 2. Verify against your 'users' table before showing the UI
           const verification = await verifyUserExistsInDatabase(session.user.id);
           if (verification.exists === false) {
             await logout();
@@ -70,12 +78,16 @@ export function AuthProvider({ children }) {
             await handleUserSession(session.user);
           }
         }
+      } catch (err) {
+        console.error("Initialization error:", err);
       } finally {
         if (mounted) setLoading(false);
       }
     };
+
     initAuth();
 
+    // Listener for state changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setLoading(false);
@@ -89,34 +101,60 @@ export function AuthProvider({ children }) {
         setUser(null);
         setUserRole(null);
         lastSyncedId.current = null;
-        localStorage.clear();
         setLoading(false);
       }
     });
+
     return () => {
       mounted = false;
       subscription?.unsubscribe();
     };
   }, [handleUserSession]);
 
-  // --- NEW SIGNUP LOGIC ---
-  const requestSignupOTP = async (email, password, role, registrationCode = null) => {
+  const login = async (email, password) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         password,
-        options: {
-          data: { 
-            role: role,
-            registration_code: registrationCode 
-          }
-        }
       });
-
       if (error) throw error;
+      const check = await verifyUserExistsInDatabase(data.user.id);
+      if (check.exists === false) throw new Error("Database profile missing.");
+      await handleUserSession(data.user);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: formatErrorMessage(err) };
+    }
+  };
 
+  const logout = async () => {
+    try {
+      // Find and remove the specific Supabase token key to prevent restoration loops
+      const sbKey = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
+      if (sbKey) localStorage.removeItem(sbKey);
+      
+      localStorage.clear();
+      await supabase.auth.signOut();
+    } finally {
+      setUser(null);
+      setUserRole(null);
+      lastSyncedId.current = null;
+      setLoading(false);
+      // Hard redirect to clear any residual memory state
+      window.location.href = '/login';
+    }
+  };
+
+  const requestSignupOTP = async (email, password, role, registrationCode = null) => {
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.toLowerCase().trim(),
+        password,
+        options: { data: { role, registration_code: registrationCode } }
+      });
+      if (error) throw error;
       setPendingVerification({ email, role });
-      return { success: true, message: "Verification code sent! Please check your email." };
+      return { success: true, message: "Verification code sent!" };
     } catch (err) {
       return { success: false, error: formatErrorMessage(err) };
     }
@@ -141,66 +179,16 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const resendSignupOTP = async (email) => {
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email.toLowerCase().trim(),
-      });
-      if (error) throw error;
-      return { success: true, message: "New verification code sent!" };
-    } catch (err) {
-      return { success: false, error: formatErrorMessage(err) };
-    }
-  };
-  // ------------------------
-
-  const login = async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase().trim(),
-        password,
-      });
-      if (error) throw error;
-      const check = await verifyUserExistsInDatabase(data.user.id);
-      if (check.exists === false) throw new Error("Database profile missing.");
-      await handleUserSession(data.user);
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: formatErrorMessage(err) };
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } finally {
-      setUser(null);
-      setUserRole(null);
-      lastSyncedId.current = null;
-      localStorage.clear();
-      setLoading(false);
-    }
-  };
-
-  const forgotPassword = async (email) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim());
-      if (error) throw error;
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: formatErrorMessage(err) };
-    }
-  };
-
   const verifyResetOTP = async (email, token) => {
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase().trim(),
         token,
         type: "recovery",
       });
       if (error) throw error;
+      // This establishes the session so resetPassword (updateUser) will work
+      if (data.user) await handleUserSession(data.user);
       return { success: true };
     } catch (err) {
       return { success: false, error: formatErrorMessage(err) };
@@ -218,27 +206,22 @@ export function AuthProvider({ children }) {
   }
 
   const value = {
-    user,
-    userRole,
-    loading,
-    error,
-    login,
-    logout,
-    requestSignupOTP,
-    verifySignupOTP,
-    resendSignupOTP,
-    pendingVerification,
-    forgotPassword,
-    resetPassword,
-    verifyResetOTP,
+    user, userRole, loading, error, login, logout,
+    requestSignupOTP, verifySignupOTP, pendingVerification,
+    resetPassword, verifyResetOTP,
+    forgotPassword: async (email) => {
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim());
+        if (error) throw error;
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: formatErrorMessage(err) };
+      }
+    },
     isAuthenticated: !!user,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
-  return context;
-}
+export const useAuth = () => useContext(AuthContext);

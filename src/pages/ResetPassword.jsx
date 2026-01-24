@@ -1,4 +1,3 @@
-// src/pages/ResetPassword.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,20 +22,25 @@ export default function ResetPassword() {
   const [passwordStrength, setPasswordStrength] = useState({ valid: false, errors: [] });
 
   useEffect(() => {
+    // 1. Recover email if the user just came from the ForgotPassword request
     const stored = localStorage.getItem('reset_email');
     if (stored) setEmail(stored);
     
-    // Catch-all for users coming from a direct recovery email link
-    if (user && window.location.hash.includes('type=recovery')) {
+    // 2. Direct Recovery Link handling:
+    // If the URL contains an access token (Supabase default) or the recovery type hash,
+    // we consider the session active and skip the OTP verification step.
+    const hash = window.location.hash;
+    if (hash.includes('type=recovery') || hash.includes('access_token=')) {
       setIsVerified(true);
     }
-  }, [user]);
+  }, []);
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     setLoading(true);
     setAlertMessage(null);
     
+    // verifyResetOTP will verify the code and sign the user in internally
     const result = await verifyResetOTP(email, otp); 
     
     if (result.success) {
@@ -59,21 +63,20 @@ export default function ResetPassword() {
     }
 
     setLoading(true);
+    // This call requires an active session (which was set by the OTP or the Recovery Link)
     const result = await resetPassword(password);
     
     if (result.success) {
       setIsSuccess(true);
       localStorage.removeItem('reset_email');
       
-      // Clear loading state so the button shows the success animation
       setLoading(false);
-      
       setAlertMessage({ 
         type: 'success', 
-        message: 'Password updated successfully! You can now go back to login.' 
+        message: 'Password updated successfully! Redirecting to login...' 
       });
       
-      // Delay navigation so the user sees the CheckCircle animation and the message
+      // Delay navigation so the user sees the success state
       setTimeout(() => navigate('/login'), 3000);
     } else {
       setLoading(false);
@@ -81,7 +84,6 @@ export default function ResetPassword() {
     }
   };
 
-  // Real-time matching logic for UI feedback
   const passwordsMatch = password === confirmPassword;
   const showMatchError = confirmPassword.length > 0 && !passwordsMatch;
 
@@ -121,7 +123,7 @@ export default function ResetPassword() {
                 disabled={loading || otp.length < 6} 
                 className="w-full btn-primary h-12 flex items-center justify-center font-bold"
               >
-                {loading ? <Loader className="animate-spin" /> : 'Verify Code'}
+                {loading ? <Loader className="animate-spin" size={24} /> : 'Verify Code'}
               </button>
             </form>
           ) : (
@@ -173,7 +175,6 @@ export default function ResetPassword() {
                  </div>
                </div>
 
-               {/* Real-time Validation Feedback */}
                <div className="text-xs space-y-1 px-1">
                  {password.length > 0 && !passwordStrength.valid && (
                     passwordStrength.errors.map((err, i) => (
@@ -189,7 +190,7 @@ export default function ResetPassword() {
                  )}
                  {password.length > 0 && passwordStrength.valid && passwordsMatch && (
                    <p className="text-green-500 flex items-center gap-1">
-                     <CheckCircle2 size={12} /> Password requirements met and match
+                     <CheckCircle2 size={12} /> Password requirements met
                    </p>
                  )}
                </div>
@@ -202,9 +203,9 @@ export default function ResetPassword() {
                 }`}
                >
                 {loading ? (
-                  <Loader className="animate-spin" />
+                  <Loader className="animate-spin" size={24} />
                 ) : isSuccess ? (
-                  <CheckCircle2 className="animate-bounce" />
+                  <CheckCircle2 className="animate-bounce" size={24} />
                 ) : (
                   'Update Password'
                 )}
