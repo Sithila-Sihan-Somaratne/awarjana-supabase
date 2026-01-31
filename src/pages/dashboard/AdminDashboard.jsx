@@ -16,13 +16,21 @@ import {
   Key,
   Camera,
   FileText,
+  Users,
+  Truck,
+  LayoutDashboard
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import DocumentGenerator from "../../components/documents/DocumentGenerator"; 
+import DocumentGenerator from "../../components/documents/DocumentGenerator";
+import UserManagement from "../../components/admin/UserManagement";
+import SupplierManagement from "../../components/admin/SupplierManagement";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // Navigation State
+  const [activeTab, setActiveTab] = useState("production"); // "production", "users", "suppliers"
 
   const [stats, setStats] = useState({
     total: 0,
@@ -39,7 +47,7 @@ export default function AdminDashboard() {
 
   // Document Modal State
   const [selectedOrderForDoc, setSelectedOrderForDoc] = useState(null);
-  const [docType, setDocType] = useState('job_card'); 
+  const [docType, setDocType] = useState('job_card');
 
   useEffect(() => {
     fetchData();
@@ -181,13 +189,48 @@ export default function AdminDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* NEW NAVIGATION BUTTONS */}
+            <button
+              onClick={() => setActiveTab("production")}
+              className={`flex items-center gap-2 px-6 py-4 rounded-2xl shadow-sm border font-black text-[10px] uppercase tracking-widest transition-all ${
+                activeTab === "production" 
+                ? "bg-indigo-600 text-white border-indigo-600" 
+                : "bg-white dark:bg-gray-900 dark:text-white dark:border-gray-800"
+              }`}
+            >
+              <LayoutDashboard size={16} /> Production
+            </button>
+
+            <button
+              onClick={() => setActiveTab("users")}
+              className={`flex items-center gap-2 px-6 py-4 rounded-2xl shadow-sm border font-black text-[10px] uppercase tracking-widest transition-all ${
+                activeTab === "users" 
+                ? "bg-indigo-600 text-white border-indigo-600" 
+                : "bg-white dark:bg-gray-900 dark:text-white dark:border-gray-800"
+              }`}
+            >
+              <Users size={16} /> Users
+            </button>
+
+            <button
+              onClick={() => setActiveTab("suppliers")}
+              className={`flex items-center gap-2 px-6 py-4 rounded-2xl shadow-sm border font-black text-[10px] uppercase tracking-widest transition-all ${
+                activeTab === "suppliers" 
+                ? "bg-indigo-600 text-white border-indigo-600" 
+                : "bg-white dark:bg-gray-900 dark:text-white dark:border-gray-800"
+              }`}
+            >
+              <Truck size={16} /> Suppliers
+            </button>
+
             <button
               onClick={() => navigate("/admin/inventory")}
               className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-gray-900 dark:text-white rounded-2xl shadow-sm border dark:border-gray-800 font-black text-[10px] uppercase tracking-widest hover:border-indigo-500 transition-all"
             >
               <Database size={16} /> Inventory
             </button>
+
             <button
               onClick={fetchData}
               className="p-4 bg-white dark:bg-gray-900 border dark:border-gray-800 rounded-2xl shadow-sm hover:rotate-180 transition-all duration-500"
@@ -197,136 +240,143 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <StatCard title="Total Orders" value={stats.total} icon={Package} color="indigo" />
-          <StatCard title="New Requests" value={stats.pending} icon={Clock} color="amber" />
-          <StatCard title="In Production" value={stats.active} icon={TrendingUp} color="blue" />
-          <StatCard title="Ready/Done" value={stats.completed} icon={CheckCircle} color="green" />
-        </div>
+        {/* CONDITIONAL RENDERING BASED ON ACTIVE TAB */}
+        {activeTab === "production" && (
+          <>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+              <StatCard title="Total Orders" value={stats.total} icon={Package} color="indigo" />
+              <StatCard title="New Requests" value={stats.pending} icon={Clock} color="amber" />
+              <StatCard title="In Production" value={stats.active} icon={TrendingUp} color="blue" />
+              <StatCard title="Ready/Done" value={stats.completed} icon={CheckCircle} color="green" />
+            </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            {/* Proofs Section */}
-            {pendingDrafts.length > 0 && (
-              <section className="bg-amber-50/50 dark:bg-amber-900/10 p-6 rounded-[2.5rem] border-2 border-dashed border-amber-200 dark:border-amber-900/30">
-                <h2 className="text-lg font-black uppercase text-amber-600 flex items-center gap-2 mb-6">
-                  <Camera size={20} /> Proofs Awaiting Approval
-                </h2>
-                <div className="grid gap-4">
-                  {pendingDrafts.map((draft) => (
-                    <div key={draft.id} className="bg-white dark:bg-gray-900 p-4 rounded-3xl flex items-center justify-between shadow-sm">
-                      <div className="flex items-center gap-4">
-                        <img src={draft.draft_url} className="w-16 h-16 rounded-xl object-cover border-2 border-amber-100" alt="Proof" />
-                        <div>
-                          <p className="text-[10px] font-black text-indigo-600 uppercase">Order {draft.order?.order_number}</p>
-                          <p className="font-bold dark:text-white text-sm">{draft.order?.title}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-8">
+                {/* Proofs Section */}
+                {pendingDrafts.length > 0 && (
+                  <section className="bg-amber-50/50 dark:bg-amber-900/10 p-6 rounded-[2.5rem] border-2 border-dashed border-amber-200 dark:border-amber-900/30">
+                    <h2 className="text-lg font-black uppercase text-amber-600 flex items-center gap-2 mb-6">
+                      <Camera size={20} /> Proofs Awaiting Approval
+                    </h2>
+                    <div className="grid gap-4">
+                      {pendingDrafts.map((draft) => (
+                        <div key={draft.id} className="bg-white dark:bg-gray-900 p-4 rounded-3xl flex items-center justify-between shadow-sm">
+                          <div className="flex items-center gap-4">
+                            <img src={draft.draft_url} className="w-16 h-16 rounded-xl object-cover border-2 border-amber-100" alt="Proof" />
+                            <div>
+                              <p className="text-[10px] font-black text-indigo-600 uppercase">Order {draft.order?.order_number}</p>
+                              <p className="font-bold dark:text-white text-sm">{draft.order?.title}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => handleApproveDraft(draft.id, draft.order_id)} className="p-3 bg-green-500 text-white rounded-xl hover:bg-green-600">
+                              <Check size={18} />
+                            </button>
+                            <button onClick={() => handleRejectDraft(draft.id, draft.order_id)} className="p-3 bg-red-500 text-white rounded-xl hover:bg-red-600">
+                              <XCircle size={18} />
+                            </button>
+                            <a href={draft.draft_url} target="_blank" rel="noreferrer" className="p-3 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-xl">
+                              <Eye size={18} />
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Production Queue */}
+                <section>
+                  <h2 className="text-xl font-black uppercase text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                    <Database size={20} className="text-indigo-600" /> Production Queue
+                  </h2>
+                  <div className="space-y-4">
+                    {orders.map((order) => (
+                      <div key={order.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] shadow-sm border dark:border-gray-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-black px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded-full uppercase">{order.order_number}</span>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                              order.status === "pending" ? "bg-amber-100 text-amber-600" : 
+                              order.status === "completed" ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"
+                            }`}>
+                              {order.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <h3 className="font-bold dark:text-white uppercase tracking-tight">{order.title}</h3>
+                          <p className="text-[10px] text-gray-500 font-bold uppercase">Customer: {order.customer?.email || 'N/A'}</p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => { setSelectedOrderForDoc(order); setDocType('job_card'); }}
+                            className="p-3 bg-amber-50 text-amber-600 dark:bg-amber-900/20 rounded-xl hover:bg-amber-100 transition-colors"
+                            title="Job Card"
+                          >
+                            <FileText size={18} />
+                          </button>
+                          
+                          {order.status === 'completed' && (
+                            <button 
+                              onClick={() => { setSelectedOrderForDoc(order); setDocType('invoice'); }}
+                              className="p-3 bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 rounded-xl hover:bg-emerald-100 transition-colors"
+                              title="Invoice"
+                            >
+                              <Package size={18} />
+                            </button>
+                          )}
+
+                          <select
+                            value={order.assigned_employer_id || ""}
+                            onChange={(e) => handleAssignWorker(order.id, e.target.value)}
+                            className="bg-gray-50 text dark:bg-gray-800 dark:text-white border-none rounded-xl px-4 py-3 text-xs font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none min-w-[160px]"
+                          >
+                            <option value="">Assign Worker...</option>
+                            {employers.map((emp) => (
+                              <option key={emp.id} value={emp.id}>{emp.email}</option>
+                            ))}
+                          </select>
+                          
+                          <button onClick={() => navigate(`/orders/${order.id}`)} className="p-3 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-xl hover:bg-gray-200">
+                            <Eye size={18} />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleApproveDraft(draft.id, draft.order_id)} className="p-3 bg-green-500 text-white rounded-xl hover:bg-green-600">
-                          <Check size={18} />
-                        </button>
-                        <button onClick={() => handleRejectDraft(draft.id, draft.order_id)} className="p-3 bg-red-500 text-white rounded-xl hover:bg-red-600">
-                          <XCircle size={18} />
-                        </button>
-                        <a href={draft.draft_url} target="_blank" rel="noreferrer" className="p-3 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-xl">
-                          <Eye size={18} />
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Production Queue */}
-            <section>
-              <h2 className="text-xl font-black uppercase text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                <Database size={20} className="text-indigo-600" /> Production Queue
-              </h2>
-              <div className="space-y-4">
-                {orders.map((order) => (
-                  <div key={order.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] shadow-sm border dark:border-gray-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-black px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded-full uppercase">{order.order_number}</span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
-                          order.status === "pending" ? "bg-amber-100 text-amber-600" : 
-                          order.status === "completed" ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"
-                        }`}>
-                          {order.status.replace('_', ' ')}
-                        </span>
-                      </div>
-                      <h3 className="font-bold dark:text-white uppercase tracking-tight">{order.title}</h3>
-                      <p className="text-[10px] text-gray-500 font-bold uppercase">Customer: {order.customer?.full_name || 'N/A'}</p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {/* Document Quick Actions */}
-                      <button 
-                        onClick={() => { setSelectedOrderForDoc(order); setDocType('job_card'); }}
-                        className="p-3 bg-amber-50 text-amber-600 dark:bg-amber-900/20 rounded-xl hover:bg-amber-100 transition-colors"
-                        title="Job Card"
-                      >
-                        <FileText size={18} />
-                      </button>
-                      
-                      {order.status === 'completed' && (
-                        <button 
-                          onClick={() => { setSelectedOrderForDoc(order); setDocType('invoice'); }}
-                          className="p-3 bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 rounded-xl hover:bg-emerald-100 transition-colors"
-                          title="Invoice"
-                        >
-                          <Package size={18} />
-                        </button>
-                      )}
-
-                      <select
-                        value={order.assigned_employer_id || ""}
-                        onChange={(e) => handleAssignWorker(order.id, e.target.value)}
-                        className="bg-gray-50 text dark:bg-gray-800 dark:text-white border-none rounded-xl px-4 py-3 text-xs font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none min-w-[160px]"
-                      >
-                        <option value="">Assign Worker...</option>
-                        {employers.map((emp) => (
-                          <option key={emp.id} value={emp.id}>{emp.email}</option>
-                        ))}
-                      </select>
-                      
-                      <button onClick={() => navigate(`/orders/${order.id}`)} className="p-3 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-xl hover:bg-gray-200">
-                        <Eye size={18} />
-                      </button>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                </section>
               </div>
-            </section>
-          </div>
 
-          {/* Access Keys Sidebar */}
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-[3rem] shadow-sm border dark:border-gray-800">
-              <h3 className="text-sm font-black uppercase text-gray-400 mb-6 flex items-center gap-2">
-                <Key size={16} /> Registration Keys
-              </h3>
-              <div className="space-y-3">
-                {codes.map((code) => (
-                  <div key={code.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border dark:border-gray-800 flex justify-between items-center">
-                    <div>
-                      <p className="text-[11px] font-mono font-black text-indigo-600 tracking-tighter">{code.plain_code}</p>
-                      <p className="text-[9px] font-black text-gray-500 uppercase mt-1">{code.role}</p>
-                    </div>
-                    {code.used ? (
-                      <CheckCircle size={14} className="text-green-500 shrink-0" />
-                    ) : (
-                      <Clock size={14} className="text-gray-300 shrink-0" />
-                    )}
+              {/* Access Keys Sidebar */}
+              <div className="space-y-6">
+                <div className="bg-white dark:bg-gray-900 p-8 rounded-[3rem] shadow-sm border dark:border-gray-800">
+                  <h3 className="text-sm font-black uppercase text-gray-400 mb-6 flex items-center gap-2">
+                    <Key size={16} /> Registration Keys
+                  </h3>
+                  <div className="space-y-3">
+                    {codes.map((code) => (
+                      <div key={code.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border dark:border-gray-800 flex justify-between items-center">
+                        <div>
+                          <p className="text-[11px] font-mono font-black text-indigo-600 tracking-tighter">{code.plain_code}</p>
+                          <p className="text-[9px] font-black text-gray-500 uppercase mt-1">{code.role}</p>
+                        </div>
+                        {code.used ? (
+                          <CheckCircle size={14} className="text-green-500 shrink-0" />
+                        ) : (
+                          <Clock size={14} className="text-gray-300 shrink-0" />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
+
+        {activeTab === "users" && <UserManagement />}
+        {activeTab === "suppliers" && <SupplierManagement />}
       </div>
 
       {/* DOCUMENT PREVIEW MODAL */}
